@@ -36,6 +36,7 @@ import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import ScheduleGrid from '../components/ScheduleGrid.vue';
 import { showToast } from '../toastState.js';
+import { apiClient } from '../api.js';
 
 const router = useRouter();
 const user = ref(null);
@@ -48,7 +49,6 @@ const createEmptySchedule = () => Array(7).fill().map(() => Array(14).fill(0));
 const createFullSchedule = () => Array(7).fill().map(() => Array(14).fill(2));
 
 const schedule = ref(createEmptySchedule());
-const API_URL = 'http://localhost:3000/api';
 
 const clearAll = () => {
   schedule.value = createEmptySchedule();
@@ -70,9 +70,7 @@ onMounted(() => {
 
 const fetchSchedule = async () => {
   try {
-    const res = await fetch(`${API_URL}/schedule/${user.value.id}`);
-    if (!res.ok) throw new Error('API 回應錯誤');
-    const data = await res.json();
+    const data = await apiClient.get(`/schedule/${user.value.id}`);
     if (data.schedule) {
       schedule.value = data.schedule;
     }
@@ -87,13 +85,7 @@ const fetchSchedule = async () => {
 const saveSchedule = async () => {
   saving.value = true;
   try {
-    const res = await fetch(`${API_URL}/schedule/${user.value.id}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ schedule: schedule.value })
-    });
-    if (!res.ok) throw new Error('API 回應錯誤');
-    const data = await res.json();
+    const data = await apiClient.post(`/schedule/${user.value.id}`, { schedule: schedule.value });
     if (data.success) {
       showToast('課表儲存成功！', 'success');
     } else {

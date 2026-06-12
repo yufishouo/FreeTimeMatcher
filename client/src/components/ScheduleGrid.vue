@@ -208,6 +208,7 @@ const handleCellClick = (dayIdx, periodIdx) => {
   border: 1px solid var(--glass-border);
   border-radius: 12px;
   overflow-x: auto;
+  touch-action: none;
 }
 
 .grid-header, .grid-row {

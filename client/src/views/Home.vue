@@ -115,6 +115,7 @@
 import { ref, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { showToast } from '../toastState.js';
+import { apiClient } from '../api.js';
 
 const router = useRouter();
 const user = ref(null);
@@ -128,8 +129,6 @@ const startDate = ref('');
 const endDate = ref('');
 const inviteCode = ref('');
 const groups = ref([]);
-
-const API_URL = 'http://localhost:3000/api';
 
 const checkUser = () => {
   const storedUser = localStorage.getItem('user');
@@ -154,12 +153,7 @@ const login = async () => {
   if (!username.value) return;
   loading.value = true;
   try {
-    const res = await fetch(`${API_URL}/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: username.value })
-    });
-    const data = await res.json();
+    const data = await apiClient.post('/login', { username: username.value });
     if (data.user) {
       localStorage.setItem('user', JSON.stringify(data.user));
       user.value = data.user;
@@ -180,9 +174,7 @@ const login = async () => {
 const fetchGroups = async () => {
   if (!user.value) return;
   try {
-    const res = await fetch(`${API_URL}/users/${user.value.id}/groups`);
-    if (!res.ok) throw new Error('API 回應錯誤');
-    const data = await res.json();
+    const data = await apiClient.get(`/users/${user.value.id}/groups`);
     if (data.groups) {
       groups.value = data.groups;
     }
@@ -215,18 +207,13 @@ const createGroup = async () => {
 
   creatingGroup.value = true;
   try {
-    const res = await fetch(`${API_URL}/groups`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        name: newGroupName.value, 
-        userId: user.value.id,
-        is_specific_dates: isSpecificDates.value,
-        start_date: startDate.value,
-        end_date: endDate.value
-      })
+    const data = await apiClient.post('/groups', { 
+      name: newGroupName.value, 
+      userId: user.value.id,
+      is_specific_dates: isSpecificDates.value,
+      start_date: startDate.value,
+      end_date: endDate.value
     });
-    const data = await res.json();
     if (data.group) {
       navigator.clipboard.writeText(data.group.invite_code)
         .then(() => {
@@ -255,13 +242,7 @@ const createGroup = async () => {
 const joinGroup = async () => {
   if (!inviteCode.value) return;
   try {
-    const res = await fetch(`${API_URL}/groups/join`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ inviteCode: inviteCode.value.toUpperCase(), userId: user.value.id })
-    });
-    if (!res.ok) throw new Error('API 回應錯誤');
-    const data = await res.json();
+    const data = await apiClient.post('/groups/join', { inviteCode: inviteCode.value.toUpperCase(), userId: user.value.id });
     if (data.error) {
       showToast(data.error, 'error');
     } else if (data.group) {

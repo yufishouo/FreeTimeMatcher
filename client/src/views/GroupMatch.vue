@@ -120,6 +120,7 @@ import { io } from 'socket.io-client';
 import html2canvas from 'html2canvas';
 import ScheduleGrid from '../components/ScheduleGrid.vue';
 import { showToast } from '../toastState.js';
+import { apiClient, SOCKET_URL } from '../api.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -141,8 +142,6 @@ const editPaintColor = ref(2);
 const savingSchedule = ref(false);
 const myGroupSchedule = ref([]);
 
-const API_URL = 'http://localhost:3000/api';
-
 onMounted(() => {
   const storedUser = localStorage.getItem('user');
   if (!storedUser) {
@@ -154,7 +153,7 @@ onMounted(() => {
   fetchMessages();
 
   // Socket.io connection
-  socket.value = io('http://localhost:3000');
+  socket.value = io(SOCKET_URL);
   socket.value.emit('join-group', route.params.id);
   
   socket.value.on('schedule-updated', () => {
@@ -181,8 +180,7 @@ const fetchGroupMatch = async (showLoading = true) => {
   const groupId = route.params.id;
   if (showLoading) loading.value = true;
   try {
-    const res = await fetch(`${API_URL}/groups/${groupId}/match`);
-    const data = await res.json();
+    const data = await apiClient.get(`/groups/${groupId}/match`);
     if (data.group) {
       group.value = data.group;
       members.value = data.members;
@@ -199,10 +197,8 @@ const deleteGroup = async () => {
   if (!confirm('確定要刪除這個群組嗎？此操作無法復原，所有成員都將失去此群組。')) return;
   
   try {
-    const res = await fetch(`${API_URL}/groups/${route.params.id}`, {
-      method: 'DELETE'
-    });
-    if (res.ok) {
+    const data = await apiClient.delete(`/groups/${route.params.id}`);
+    if (data.success) {
       showToast('群組已成功刪除', 'success');
       router.push('/');
     } else {
@@ -225,12 +221,8 @@ const initMyGroupSchedule = () => {
 const saveGroupSchedule = async () => {
   savingSchedule.value = true;
   try {
-    const res = await fetch(`${API_URL}/groups/${route.params.id}/schedule`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: currentUser.value.id, schedule: myGroupSchedule.value })
-    });
-    if (res.ok) {
+    const data = await apiClient.post(`/groups/${route.params.id}/schedule`, { userId: currentUser.value.id, schedule: myGroupSchedule.value });
+    if (data.success) {
       showToast('群組專屬課表已儲存', 'success');
       showEditModal.value = false;
       fetchGroupMatch();
@@ -244,8 +236,7 @@ const saveGroupSchedule = async () => {
 
 const fetchMessages = async () => {
   try {
-    const res = await fetch(`${API_URL}/groups/${route.params.id}/messages`);
-    const data = await res.json();
+    const data = await apiClient.get(`/groups/${route.params.id}/messages`);
     if (data.messages) {
       messages.value = data.messages;
       scrollToBottom();
@@ -258,14 +249,8 @@ const fetchMessages = async () => {
 const sendMessage = async () => {
   if (!newMessage.value.trim()) return;
   try {
-    const res = await fetch(`${API_URL}/groups/${route.params.id}/messages`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: currentUser.value.id, message: newMessage.value.trim() })
-    });
-    if (res.ok) {
-      newMessage.value = '';
-    }
+    await apiClient.post(`/groups/${route.params.id}/messages`, { userId: currentUser.value.id, message: newMessage.value.trim() });
+    newMessage.value = '';
   } catch (error) {
     showToast('留言傳送失敗', 'error');
   }

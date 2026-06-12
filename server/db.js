@@ -17,7 +17,8 @@ async function setupDB() {
 
   await db.exec(`CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE
+    username TEXT UNIQUE NOT NULL,
+    password TEXT NOT NULL
   )`);
 
   await db.exec(`CREATE TABLE IF NOT EXISTS schedules (
@@ -59,10 +60,23 @@ async function setupDB() {
     FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
   )`);
 
+  // Performance Optimization: Add Indices for frequent lookups
+  await db.exec(`CREATE INDEX IF NOT EXISTS idx_messages_group_id ON messages(group_id)`);
+  await db.exec(`CREATE INDEX IF NOT EXISTS idx_group_members_user_id ON group_members(user_id)`);
+
   // Alter groups table (safe to fail if already exists)
   try { await db.exec(`ALTER TABLE groups ADD COLUMN is_specific_dates INTEGER DEFAULT 0`); } catch (e) {}
   try { await db.exec(`ALTER TABLE groups ADD COLUMN start_date TEXT`); } catch (e) {}
   try { await db.exec(`ALTER TABLE groups ADD COLUMN end_date TEXT`); } catch (e) {}
+  try { await db.exec(`ALTER TABLE groups ADD COLUMN creator_id INTEGER`); } catch (e) {}
+
+  // Alter group_members table
+  try { await db.exec(`ALTER TABLE group_members ADD COLUMN weight INTEGER DEFAULT 1`); } catch (e) {}
+  try { await db.exec(`ALTER TABLE group_members ADD COLUMN role TEXT DEFAULT 'member'`); } catch (e) {}
+
+  // Alter messages table
+  try { await db.exec(`ALTER TABLE messages ADD COLUMN type TEXT DEFAULT 'text'`); } catch (e) {}
+  try { await db.exec(`ALTER TABLE messages ADD COLUMN payload TEXT`); } catch (e) {}
 
   dbInstance = db;
   return db;

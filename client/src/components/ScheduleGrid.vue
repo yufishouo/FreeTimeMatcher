@@ -49,6 +49,9 @@
           <p>{{ selectedCell.busyMembers.join(', ') || '無' }}</p>
         </div>
       </div>
+      <div class="mt-4" style="text-align: right;">
+        <button class="btn btn-primary" @click="$emit('create-poll', { day: selectedCell.dayIdx, period: selectedCell.periodIdx, dayStr: days[selectedCell.dayIdx], periodStr: (selectedCell.periodIdx + 1).toString(), count: gridData[selectedCell.dayIdx][selectedCell.periodIdx].count })">發起投票</button>
+      </div>
     </div>
   </div>
 </template>
@@ -87,7 +90,7 @@ const props = defineProps({
   }
 });
 
-const emit = defineEmits(['update:modelValue']);
+const emit = defineEmits(['update:modelValue', 'create-poll']);
 
 const periods = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14'];
 
@@ -208,7 +211,6 @@ const handleCellClick = (dayIdx, periodIdx) => {
   border: 1px solid var(--glass-border);
   border-radius: 12px;
   overflow-x: auto;
-  touch-action: none;
 }
 
 .grid-header, .grid-row {
@@ -218,12 +220,12 @@ const handleCellClick = (dayIdx, periodIdx) => {
 }
 
 .grid-header {
-  background: rgba(0,0,0,0.3);
+  background: transparent;
   font-weight: 600;
 }
 
 .grid-row:not(:last-child) {
-  border-bottom: 1px solid rgba(255,255,255,0.05);
+  border-bottom: none;
 }
 
 .time-col-header, .time-col {
@@ -232,7 +234,7 @@ const handleCellClick = (dayIdx, periodIdx) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0,0,0,0.2);
+  background: transparent;
   border-right: 1px solid rgba(255,255,255,0.05);
   font-size: 0.875rem;
   color: var(--text-muted);
@@ -246,7 +248,8 @@ const handleCellClick = (dayIdx, periodIdx) => {
   flex: 1;
   text-align: center;
   padding: 12px 0;
-  border-right: 1px solid rgba(255,255,255,0.05);
+  margin: 0 2px;
+  border-right: none;
   transition: background 0.2s;
 }
 
@@ -261,44 +264,66 @@ const handleCellClick = (dayIdx, periodIdx) => {
 .grid-cell {
   flex: 1;
   height: 40px;
-  border-right: 1px solid rgba(255,255,255,0.05);
+  margin: 2px;
+  border-radius: 8px;
+  border-right: none;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), background 0.2s ease, box-shadow 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(239, 68, 68, 0.1); /* Default Busy (Red tint) */
+  background: rgba(239, 68, 68, 0.15); /* Default Busy */
   user-select: none;
+  box-shadow: inset 0 2px 4px rgba(255,255,255,0.05);
+  will-change: transform, box-shadow, background;
 }
 
 .grid-cell:not(.is-heatmap):hover {
-  background: rgba(255,255,255,0.1);
+  filter: brightness(1.2);
+  transform: scale(1.05);
+  box-shadow: var(--shadow-md), inset 0 2px 4px rgba(255,255,255,0.2);
+  z-index: 2;
+}
+
+.grid-cell:not(.is-heatmap):active {
+  transform: scale(0.95);
 }
 
 .grid-cell.is-free-2:not(.is-heatmap) {
-  background: rgba(16, 185, 129, 0.4); /* Free (Green) */
+  background: rgba(16, 185, 129, 0.5); /* Free */
 }
 
 .grid-cell.is-free-2:not(.is-heatmap):hover {
-  background: rgba(16, 185, 129, 0.6);
+  background: rgba(16, 185, 129, 0.7);
 }
 
 .grid-cell.is-free-1:not(.is-heatmap) {
-  background: rgba(245, 158, 11, 0.4); /* Maybe (Yellow) */
+  background: rgba(245, 158, 11, 0.5); /* Maybe */
 }
 
 .grid-cell.is-free-1:not(.is-heatmap):hover {
-  background: rgba(245, 158, 11, 0.6);
+  background: rgba(245, 158, 11, 0.7);
 }
 
 .grid-cell.is-free-0:not(.is-heatmap) {
-  background: rgba(239, 68, 68, 0.1); /* Busy (Red tint) */
+  background: rgba(239, 68, 68, 0.15); /* Busy */
 }
 
 /* Heatmap Colors */
 .grid-cell.is-heatmap {
   cursor: pointer;
-  background: rgba(0,0,0,0.2); /* Default 0 count */
+  background: rgba(0,0,0,0.1); /* Default 0 count */
+}
+
+.grid-cell.is-heatmap:hover {
+  filter: brightness(1.2);
+  transform: scale(1.05);
+  box-shadow: var(--shadow-md), inset 0 2px 4px rgba(255,255,255,0.2);
+  z-index: 5;
+}
+
+.grid-cell.is-heatmap:active {
+  transform: scale(0.95);
 }
 
 .grid-cell.is-selected {
@@ -314,13 +339,13 @@ const handleCellClick = (dayIdx, periodIdx) => {
   pointer-events: none;
 }
 
-.grid-cell.heatmap-1 { background: rgba(99, 102, 241, 0.2); }
-.grid-cell.heatmap-2 { background: rgba(99, 102, 241, 0.4); }
-.grid-cell.heatmap-3 { background: rgba(99, 102, 241, 0.6); }
-.grid-cell.heatmap-4 { background: rgba(99, 102, 241, 0.8); }
+.grid-cell.heatmap-1 { background: rgba(99, 102, 241, 0.3); }
+.grid-cell.heatmap-2 { background: rgba(99, 102, 241, 0.5); }
+.grid-cell.heatmap-3 { background: rgba(99, 102, 241, 0.7); }
+.grid-cell.heatmap-4 { background: rgba(99, 102, 241, 0.9); }
 .grid-cell.heatmap-5 { 
   background: var(--success);
-  box-shadow: inset 0 0 10px rgba(255,255,255,0.5);
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.5), inset 0 2px 4px rgba(255,255,255,0.3);
   color: white;
 }
 .grid-cell.heatmap-5 .heatmap-count {
@@ -347,7 +372,6 @@ const handleCellClick = (dayIdx, periodIdx) => {
 
 .cell-detail-card {
   padding: 20px;
-  background: rgba(10, 10, 15, 0.8);
 }
 
 .cell-detail-card h4 {
@@ -366,7 +390,8 @@ const handleCellClick = (dayIdx, periodIdx) => {
 .free-list, .maybe-list, .busy-list {
   flex: 1;
   min-width: 150px;
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(128, 128, 128, 0.1);
+  border: 1px solid var(--glass-border);
   padding: 16px;
   border-radius: 8px;
 }

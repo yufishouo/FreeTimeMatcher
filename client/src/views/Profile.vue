@@ -2,11 +2,11 @@
   <div class="container mt-8">
     <div class="header-section">
       <div>
-        <h2>我的課表</h2>
-        <p class="text-muted">點擊格子切換有課/空堂狀態。綠色代表空堂，紅色代表有課。</p>
+        <h2>專屬課表設定</h2>
+        <p class="text-muted">請在下方網格繪製您的行程。綠色代表完全有空，紅色代表已經有約。</p>
       </div>
       <div class="actions">
-        <button @click="fillAll" class="btn btn-outline" style="margin-right: 8px;">滿 填滿整週</button>
+        <button @click="fillAll" class="btn btn-outline" style="margin-right: 8px;">✨ 填滿整週</button>
         <button @click="clearAll" class="btn btn-outline" style="margin-right: 16px;">🗑️ 清空整週</button>
         <button @click="saveSchedule" class="btn btn-primary" :disabled="saving">
           {{ saving ? '儲存中...' : '儲存課表' }}
@@ -15,7 +15,7 @@
     </div>
 
     <div class="paint-palette-container glass-panel mt-4 mb-4">
-      <h4>🎨 選擇畫筆狀態後，拖曳下方課表快速填寫</h4>
+      <h4>🎨 智慧畫筆模式：點選下方狀態後，在課表上直接拖曳即可快速塗繪。</h4>
       <div class="paint-palette mt-2">
         <button class="btn" :class="{'btn-active': paintColor === 2}" style="background: rgba(16, 185, 129, 0.4); border-color: rgba(16, 185, 129, 0.8);" @click="paintColor = 2">✅ 有空</button>
         <button class="btn" :class="{'btn-active': paintColor === 1}" style="background: rgba(245, 158, 11, 0.4); border-color: rgba(245, 158, 11, 0.8);" @click="paintColor = 1">⚠️ 盡量不要</button>

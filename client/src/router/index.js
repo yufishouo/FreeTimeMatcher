@@ -5,6 +5,7 @@ import GroupMatch from '../views/GroupMatch.vue'
 
 const routes = [
   { path: '/', component: Home },
+  { path: '/join/:inviteCode', component: Home },
   { path: '/profile', component: Profile },
   { path: '/group/:id', component: GroupMatch }
 ]

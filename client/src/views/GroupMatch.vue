@@ -8,34 +8,66 @@
     </div>
 
     <div v-else>
-      <div class="header-section">
-        <div>
-          <div class="flex-align-center gap-2">
-            <h2>{{ group.name }}</h2>
-            <span class="invite-badge">邀請碼: {{ group.invite_code }}</span>
+      <div class="group-header glass-panel mb-4" style="padding: 24px;">
+        <div class="header-top" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 24px;">
+          
+          <div class="title-area" style="flex: 1 1 300px;">
+            <div class="flex-align-center gap-2" style="flex-wrap: wrap; margin-bottom: 12px;">
+              <h2 class="group-title">{{ group.name }}</h2>
+              <span class="invite-badge">邀請碼: {{ group.invite_code }}</span>
+            </div>
+            <div class="member-list" style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <div v-for="m in members" :key="m.id" class="member-tag glass-panel-inner">
+                <span class="member-name">{{ m.username }}</span>
+                <span v-if="m.id === group.creator_id" title="管理員">👑</span>
+                <span v-else-if="m.role === 'subadmin'" title="副管理員">🛡️</span>
+                <template v-if="isAdmin">
+                  <select v-model="m.weight" @change="changeWeight(m.id, m.weight)" class="mini-select">
+                    <option :value="1">權重 1</option>
+                    <option :value="2">權重 2</option>
+                    <option :value="5">權重 5</option>
+                    <option :value="10">權重 10</option>
+                  </select>
+                  <select v-if="isCreator && m.id !== group.creator_id" v-model="m.role" @change="toggleRole(m)" class="mini-select">
+                    <option value="member">一般成員</option>
+                    <option value="subadmin">副管理員</option>
+                  </select>
+                  <button v-if="isCreator && m.id !== currentUser.id" @click="kickMember(m.id)" class="kick-btn" title="移除成員">✖</button>
+                </template>
+                <template v-else-if="m.weight > 1">
+                  <span class="text-warning weight-display">(權重: {{ m.weight }})</span>
+                </template>
+              </div>
+            </div>
           </div>
-          <p class="text-muted mt-2">群組成員: {{ members.map(m => m.username).join(', ') }}</p>
-        </div>
-        <div class="header-actions">
-          <button @click="deleteGroup" class="btn btn-outline" style="margin-right: 12px; color: var(--danger); border-color: rgba(239, 68, 68, 0.5);">🗑️ 刪除群組</button>
-          <button v-if="group.is_specific_dates" @click="showEditModal = true" class="btn btn-primary" style="margin-right: 12px;">✏️ 填寫群組課表</button>
-          <button @click="refreshMatch" class="btn btn-outline" style="margin-right: 12px;">🔄 重整結果</button>
-          <button @click="downloadImage" class="btn btn-outline" style="margin-right: 12px;" :disabled="downloading">📸 下載圖片</button>
-          <button @click="copyRecommendations" class="btn btn-primary" style="margin-right: 12px;">📋 複製結果</button>
-          <router-link to="/" class="btn btn-outline">返回列表</router-link>
+
+          <div class="header-actions" style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: flex-end; flex: 1 1 400px;">
+            <button v-if="isCreator" @click="deleteGroup" class="btn btn-outline" style="color: var(--danger); border-color: rgba(239, 68, 68, 0.5); white-space: nowrap;">🗑️ 刪除群組</button>
+            <button v-else @click="leaveGroup" class="btn btn-outline" style="color: var(--danger); border-color: rgba(239, 68, 68, 0.5); white-space: nowrap;">🚪 退出群組</button>
+            <button v-if="group.is_specific_dates" @click="showEditModal = true" class="btn btn-primary" style="white-space: nowrap; box-shadow: 0 0 15px rgba(99,102,241,0.5);">✏️ 填寫群組課表</button>
+            <button @click="refreshMatch" class="btn btn-outline" style="white-space: nowrap;">🔄 重整</button>
+            <button @click="copyInviteLink" class="btn btn-outline" style="white-space: nowrap;">🔗 邀請</button>
+            <button @click="downloadImage" class="btn btn-outline" :disabled="downloading" style="white-space: nowrap;">📸 截圖</button>
+            <button @click="copyRecommendations" class="btn btn-primary" style="white-space: nowrap;">📋 複製</button>
+            <router-link to="/" class="btn btn-outline" style="white-space: nowrap;">返回</router-link>
+          </div>
+          
         </div>
       </div>
 
       <!-- 系統推薦最佳開會時間 -->
       <div v-if="recommendedTimes.length > 0" class="recommendations-panel glass-panel mt-4 mb-4">
-        <h3 class="mb-3 text-highlight">🏆 系統推薦最佳開會時間</h3>
+        <h3 class="mb-3 text-highlight">🏆 智慧分析：最佳集會時段推薦</h3>
         <div class="recommendation-cards">
-          <div v-for="(rt, idx) in recommendedTimes" :key="idx" class="reco-card glass-panel-inner">
-            <div class="reco-medal">{{ idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉' }}</div>
-            <div class="reco-info">
-              <h4>星期{{ rt.dayStr }} 第 {{ rt.periodStr }} 節</h4>
-              <p :class="rt.count === members.length ? 'text-success' : 'text-warning'">{{ rt.count }} / {{ members.length }} 人有空</p>
+          <div v-for="(rt, idx) in recommendedTimes" :key="idx" class="reco-card glass-panel-inner" style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; gap: 16px; align-items: center;">
+              <div class="reco-medal">{{ idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '🎖️' }}</div>
+              <div class="reco-info">
+                <h4>星期{{ rt.dayStr }} 第 {{ rt.periodStr }} 節</h4>
+                <p :class="rt.count >= totalWeight ? 'text-success' : 'text-warning'">綜合契合度分數 {{ rt.count }} / {{ totalWeight }}</p>
+              </div>
             </div>
+            <button @click="createPoll(rt)" class="btn btn-sm btn-primary" style="white-space: nowrap; flex-shrink: 0;">發起投票</button>
           </div>
         </div>
       </div>
@@ -43,7 +75,7 @@
       <!-- 熱力圖與圖例區塊 (供截圖用) -->
       <div ref="exportContainer" class="export-wrapper" style="padding: 16px; border-radius: 12px;">
         <div class="legend glass-panel mt-4 mb-4">
-          <h4>圖例說明 (共同空堂人數)</h4>
+          <h4>🔥 空堂熱力圖例 (共同空閒狀態)</h4>
           <div class="legend-items mt-2">
             <div class="legend-item"><div class="color-box heatmap-0"></div> 0人</div>
             <div class="legend-item"><div class="color-box heatmap-1"></div> 少數</div>
@@ -59,9 +91,10 @@
             :modelValue="heatmapData" 
             :members="members"
             readonly 
-            :totalMembers="members.length"
+            :totalMembers="totalWeight"
             :highlightCells="recommendedTimes"
             :days="customDays"
+            @create-poll="createPoll"
           />
         </div>
       </div>
@@ -73,6 +106,15 @@
           <div v-for="msg in messages" :key="msg.id" class="message-bubble" :class="{'my-message': msg.username === currentUser.username}">
             <div class="message-sender">{{ msg.username }} <span class="message-time">{{ new Date(msg.created_at).toLocaleTimeString() }}</span></div>
             <div class="message-text">{{ msg.message }}</div>
+            
+            <div v-if="msg.type === 'poll'" class="poll-container mt-2" style="background: rgba(0,0,0,0.2); padding: 8px; border-radius: 8px;">
+              <div v-for="(opt, oIdx) in (msg.parsedPayload?.options || [])" :key="oIdx" class="poll-option mb-2">
+                <button @click="votePoll(msg.id, oIdx)" class="btn btn-sm" style="width: 100%; text-align: left; display: flex; justify-content: space-between;" :class="(opt.voters || []).includes(currentUser.id) ? 'btn-primary' : 'btn-outline'">
+                  <span>{{ opt.text }}</span>
+                  <span>{{ (opt.voters || []).length }} 票</span>
+                </button>
+              </div>
+            </div>
           </div>
           <div v-if="messages.length === 0" class="text-muted text-center py-4">尚無留言，來搶頭香吧！</div>
         </div>
@@ -122,13 +164,31 @@ import ScheduleGrid from '../components/ScheduleGrid.vue';
 import { showToast } from '../toastState.js';
 import { apiClient, SOCKET_URL } from '../api.js';
 
-const route = useRoute();
 const router = useRouter();
+const route = useRoute();
+
 const loading = ref(true);
 const group = ref(null);
 const members = ref([]);
 const currentUser = ref(null);
 const socket = ref(null);
+
+const isCreator = computed(() => {
+  return group.value && currentUser.value && group.value.creator_id === currentUser.value.id;
+});
+
+const myRole = computed(() => {
+  if (!currentUser.value) return 'member';
+  const me = members.value.find(m => m.id === currentUser.value.id);
+  return me ? me.role : 'member';
+});
+
+const isSubAdmin = computed(() => myRole.value === 'subadmin');
+const isAdmin = computed(() => isCreator.value || isSubAdmin.value);
+
+const totalWeight = computed(() => {
+  return members.value.reduce((sum, m) => sum + (m.weight || 1), 0);
+});
 
 const messages = ref([]);
 const newMessage = ref('');
@@ -157,13 +217,44 @@ onMounted(() => {
   socket.value.emit('join-group', route.params.id);
   
   socket.value.on('schedule-updated', () => {
-    // Silently refresh match data
     fetchGroupMatch(false);
   });
 
   socket.value.on('new-message', (msg) => {
+    if (msg.type === 'poll') {
+      try { msg.parsedPayload = JSON.parse(msg.payload); } catch(e) {}
+    }
     messages.value.push(msg);
     scrollToBottom();
+    
+    if (msg.username !== currentUser.value?.username) {
+      playNotificationSound();
+    }
+  });
+  
+  socket.value.on('poll-updated', ({ messageId, payload }) => {
+    const msg = messages.value.find(m => m.id === messageId);
+    if (msg) {
+      msg.payload = payload;
+      try { msg.parsedPayload = JSON.parse(payload); } catch(e) {}
+    }
+  });
+
+  socket.value.on('member-kicked', (kickedUserId) => {
+    if (kickedUserId === currentUser.value.id) {
+      showToast('您已被管理員移除群組', 'error');
+      router.push('/');
+    } else {
+      fetchGroupMatch();
+    }
+  });
+
+  socket.value.on('weight-updated', () => {
+    fetchGroupMatch();
+  });
+
+  socket.value.on('role-updated', () => {
+    fetchGroupMatch();
   });
 
   socket.value.on('group-deleted', () => {
@@ -195,9 +286,8 @@ const fetchGroupMatch = async (showLoading = true) => {
 
 const deleteGroup = async () => {
   if (!confirm('確定要刪除這個群組嗎？此操作無法復原，所有成員都將失去此群組。')) return;
-  
   try {
-    const data = await apiClient.delete(`/groups/${route.params.id}`);
+    const data = await apiClient.delete(`/groups/${route.params.id}`, { userId: currentUser.value.id });
     if (data.success) {
       showToast('群組已成功刪除', 'success');
       router.push('/');
@@ -206,6 +296,78 @@ const deleteGroup = async () => {
     }
   } catch (error) {
     showToast('刪除失敗', 'error');
+  }
+};
+
+const leaveGroup = async () => {
+  if (!confirm('確定要退出這個群組嗎？此操作無法復原。')) return;
+  try {
+    await apiClient.delete(`/groups/${route.params.id}/members/${currentUser.value.id}`, { userId: currentUser.value.id });
+    showToast('您已退出群組', 'success');
+    router.push('/');
+  } catch (error) {
+    showToast('退出群組失敗', 'error');
+  }
+};
+
+const kickMember = async (memberId) => {
+  if (!confirm('確定要移除該成員嗎？')) return;
+  try {
+    const data = await apiClient.delete(`/groups/${route.params.id}/members/${memberId}`, { userId: currentUser.value.id });
+    if (data && data.error) throw new Error(data.error);
+    showToast('成員已成功移除', 'success');
+    fetchGroupMatch();
+  } catch (e) {
+    showToast(e.message || '無法移除該成員，請稍後再試', 'error');
+  }
+};
+
+const playNotificationSound = () => {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+    
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    
+    gainNode.gain.setValueAtTime(0, ctx.currentTime);
+    gainNode.gain.linearRampToValueAtTime(0.05, ctx.currentTime + 0.05);
+    gainNode.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.2);
+    
+    osc.connect(gainNode);
+    gainNode.connect(ctx.destination);
+    
+    osc.start();
+    osc.stop(ctx.currentTime + 0.2);
+  } catch (e) {
+    // Ignore audio context errors
+  }
+};
+
+const changeWeight = async (memberId, newWeight) => {
+  try {
+    const data = await apiClient.put(`/groups/${group.value.id}/members/${memberId}/weight`, { 
+      userId: currentUser.value.id,
+      weight: newWeight
+    });
+    if (data && data.error) throw new Error(data.error);
+  } catch (err) {
+    showToast(err.message || '更改權重失敗', 'error');
+  }
+};
+
+const toggleRole = async (member) => {
+  try {
+    const data = await apiClient.put(`/groups/${group.value.id}/members/${member.id}/role`, {
+      userId: currentUser.value.id,
+      role: member.role
+    });
+    if (data && data.error) throw new Error(data.error);
+    showToast(`已將 ${member.username} 設為${member.role === 'subadmin' ? '副管理員' : '一般成員'}`, 'success');
+  } catch (err) {
+    console.error('Role update error:', err);
+    showToast(err.message || '更改身分失敗', 'error');
   }
 };
 
@@ -238,7 +400,12 @@ const fetchMessages = async () => {
   try {
     const data = await apiClient.get(`/groups/${route.params.id}/messages`);
     if (data.messages) {
-      messages.value = data.messages;
+      messages.value = data.messages.map(m => {
+        if (m.type === 'poll') {
+          try { m.parsedPayload = JSON.parse(m.payload); } catch(e) {}
+        }
+        return m;
+      });
       scrollToBottom();
     }
   } catch (error) {
@@ -253,6 +420,37 @@ const sendMessage = async () => {
     newMessage.value = '';
   } catch (error) {
     showToast('留言傳送失敗', 'error');
+  }
+};
+
+const createPoll = async (rt) => {
+  const pollData = {
+    options: [
+      { text: `星期${rt.dayStr} 第 ${rt.periodStr} 節 好嗎？`, voters: [] },
+      { text: `我沒空 / 時間不行`, voters: [] }
+    ]
+  };
+  try {
+    await apiClient.post(`/groups/${route.params.id}/messages`, {
+      userId: currentUser.value.id,
+      message: `發起了開會時間投票：星期${rt.dayStr} 第 ${rt.periodStr} 節`,
+      type: 'poll',
+      payload: JSON.stringify(pollData)
+    });
+    showToast('已發起投票', 'success');
+  } catch(e) {
+    showToast('發起投票失敗', 'error');
+  }
+};
+
+const votePoll = async (messageId, optionIndex) => {
+  try {
+    await apiClient.post(`/messages/${messageId}/vote`, {
+      userId: currentUser.value.id,
+      optionIndex
+    });
+  } catch (e) {
+    showToast('投票失敗', 'error');
   }
 };
 
@@ -290,14 +488,15 @@ const heatmapData = computed(() => {
   if (!members.value.length) return result;
 
   members.value.forEach(member => {
+    const weight = member.weight || 1;
     if (member.schedule) {
       for (let day = 0; day < customDays.value.length; day++) {
         for (let period = 0; period < 14; period++) {
           const state = member.schedule[day]?.[period];
           if (state === 2) {
-            result[day][period] += 1;
+            result[day][period] += weight;
           } else if (state === 1) {
-            result[day][period] += 0.5;
+            result[day][period] += (weight * 0.5);
           }
         }
       }
@@ -333,19 +532,33 @@ const recommendedTimes = computed(() => {
 });
 
 // 一鍵複製結果
-const copyRecommendations = () => {
+const copyRecommendations = async () => {
   if (recommendedTimes.value.length === 0) {
     showToast('目前沒有推薦的空堂時段！', 'info');
     return;
   }
   let text = `【${group.value.name}】最佳開會時間推薦：\n\n`;
   recommendedTimes.value.forEach((rt, idx) => {
-    const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉';
-    text += `${medal} 星期${rt.dayStr} 第 ${rt.periodStr} 節 (${rt.count}/${members.value.length}人有空)\n`;
+    const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '🎖️';
+    text += `${medal} 星期${rt.dayStr} 第 ${rt.periodStr} 節 (權重分數 ${rt.count}/${totalWeight.value})\n`;
   });
   text += `\n✨ 使用 FreeTimeMatcher 快速媒合空堂！`;
-  navigator.clipboard.writeText(text);
-  showToast('推薦結果已複製到剪貼簿！', 'success');
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast('推薦結果已複製到剪貼簿！', 'success');
+  } catch(e) {
+    showToast('瀏覽器不支援複製，請手動框選', 'error');
+  }
+};
+
+const copyInviteLink = async () => {
+  const url = `${window.location.origin}/join/${group.value.invite_code}`;
+  try {
+    await navigator.clipboard.writeText(url);
+    showToast('專屬邀請連結已複製！快貼給朋友吧', 'success');
+  } catch(e) {
+    showToast('複製失敗，請直接複製上方網址列', 'error');
+  }
 };
 
 const downloadImage = async () => {
@@ -380,9 +593,80 @@ const downloadImage = async () => {
 .text-danger { color: var(--danger); }
 .gap-2 { gap: 8px; }
 
+.group-title {
+  margin: 0;
+  font-size: 2.5rem;
+  background: linear-gradient(135deg, var(--text-main), var(--primary));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  white-space: nowrap;
+}
+
 .flex-align-center {
   display: flex;
   align-items: center;
+}
+
+.member-tag {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.95rem;
+  transition: all 0.2s;
+}
+
+.member-tag:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+
+.member-name {
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.mini-select {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  color: var(--text-main);
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 0.8rem;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.mini-select:hover {
+  border-color: var(--primary);
+}
+
+.mini-select option {
+  color: var(--text-main);
+  background: var(--mesh-1);
+}
+
+.kick-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--danger);
+  font-size: 1rem;
+  margin-left: 4px;
+  transition: transform 0.2s, filter 0.2s;
+}
+
+.kick-btn:hover {
+  transform: scale(1.2);
+  filter: drop-shadow(0 0 4px rgba(239, 68, 68, 0.5));
+}
+
+.weight-display {
+  font-size: 0.8rem;
+  margin-left: 4px;
 }
 
 .header-section {
@@ -462,9 +746,9 @@ const downloadImage = async () => {
   align-items: center;
   gap: 16px;
   padding: 16px;
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(128, 128, 128, 0.1);
   border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--glass-border);
 }
 
 .reco-medal {
@@ -496,18 +780,21 @@ const downloadImage = async () => {
 }
 
 .message-bubble {
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--glass-bg);
   padding: 12px 16px;
-  border-radius: 12px;
+  border-radius: 18px 18px 18px 4px;
   max-width: 80%;
   align-self: flex-start;
-  border: 1px solid rgba(255,255,255,0.05);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(10px);
 }
 
 .message-bubble.my-message {
   align-self: flex-end;
-  background: rgba(99, 102, 241, 0.15);
-  border-color: rgba(99, 102, 241, 0.3);
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(236, 72, 153, 0.2));
+  border-color: rgba(236, 72, 153, 0.3);
+  border-radius: 18px 18px 4px 18px;
 }
 
 .message-sender {

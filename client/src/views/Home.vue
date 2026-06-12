@@ -8,18 +8,36 @@
       <p class="hero-subtitle">快速比對群組成員課表，讓社團開會、小組討論不再難產。</p>
       
       <div class="login-card glass-panel mx-auto">
-        <h2>馬上開始使用</h2>
-        <form @submit.prevent="login" class="login-form">
-          <input 
-            type="text" 
-            v-model="username" 
-            placeholder="輸入您的暱稱" 
-            class="input-field"
-            required
-            :disabled="loading"
-          />
+        <div class="auth-tabs" style="display: flex; justify-content: center; gap: 32px; margin-bottom: 24px; position: relative;">
+          <h2 :class="{'active-tab': isLoginMode, 'inactive-tab': !isLoginMode}" @click="isLoginMode = true" style="cursor: pointer; margin: 0; padding-bottom: 8px; transition: 0.3s;">登入</h2>
+          <h2 :class="{'active-tab': !isLoginMode, 'inactive-tab': isLoginMode}" @click="isLoginMode = false" style="cursor: pointer; margin: 0; padding-bottom: 8px; transition: 0.3s;">註冊</h2>
+          <div class="tab-indicator" :style="{ left: isLoginMode ? 'calc(50% - 64px)' : 'calc(50% + 24px)' }"></div>
+        </div>
+        <form @submit.prevent="authAction" class="login-form">
+          <div style="margin-bottom: 16px; text-align: left;">
+            <label class="form-label">專屬代號 (帳號)</label>
+            <input 
+              type="text" 
+              v-model="username" 
+              placeholder="輸入您的專屬代號" 
+              class="input-field"
+              required
+              :disabled="loading"
+            />
+          </div>
+          <div style="margin-bottom: 24px; text-align: left;">
+            <label class="form-label">登入密碼</label>
+            <input 
+              type="password" 
+              v-model="password" 
+              placeholder="請設定至少 6 位數密碼" 
+              class="input-field"
+              required
+              :disabled="loading"
+            />
+          </div>
           <button type="submit" class="btn btn-primary w-full" :disabled="loading">
-            {{ loading ? '登入中...' : '進入系統' }}
+            {{ loading ? '處理中...' : (isLoginMode ? '登入系統' : '註冊帳號') }}
           </button>
         </form>
       </div>
@@ -28,15 +46,15 @@
     <!-- Dashboard for Logged in Users -->
     <div v-else class="dashboard">
       <div class="dashboard-header">
-        <h2>我的群組</h2>
-        <p class="text-muted">管理您的群組或加入新群組來比對空堂時間。</p>
+        <h2>歡迎回來，{{ user?.username }}！</h2>
+        <p class="text-muted">在這裡管理您的所有集會群組，或是加入好友的討論行列。</p>
       </div>
 
       <div class="grid">
         <!-- Create Group Card -->
         <div class="glass-panel action-card">
           <h3>建立新群組</h3>
-          <p class="text-muted mb-4">建立一個專屬群組，邀請好友加入比對。</p>
+          <p class="text-muted mb-4">發起專屬集會群組，一鍵產生邀請碼，輕鬆比對所有人的空堂。</p>
           <form @submit.prevent="createGroup">
             <div class="mb-3">
               <label class="form-label">群組名稱</label>
@@ -75,7 +93,7 @@
         <!-- Join Group Card -->
         <div class="glass-panel action-card">
           <h3>加入群組</h3>
-          <p class="text-muted mb-4">輸入好友分享的邀請碼，加入現有群組。</p>
+          <p class="text-muted mb-4">手邊有邀請碼嗎？立刻輸入序號，加入好友的開會行列。</p>
           <form @submit.prevent="joinGroup">
             <input 
               type="text" 
@@ -93,7 +111,7 @@
       <div class="group-list mt-8">
         <h3>已加入的群組</h3>
         <div v-if="groups.length === 0" class="empty-state glass-panel mt-4">
-          您還沒有加入任何群組，趕快建立或加入一個吧！
+          您目前尚未參與任何群組，趕快建立或加入一個吧！
         </div>
         <div v-else class="grid mt-4">
           <div v-for="group in groups" :key="group.id" class="glass-panel group-card">
@@ -113,14 +131,18 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import { showToast } from '../toastState.js';
 import { apiClient } from '../api.js';
 
 const router = useRouter();
+const route = useRoute();
 const user = ref(null);
-const username = ref('');
+const groups = ref([]);
 const loading = ref(false);
+const username = ref('');
+const password = ref('');
+const isLoginMode = ref(true);
 const creatingGroup = ref(false);
 
 const newGroupName = ref('');
@@ -128,7 +150,6 @@ const isSpecificDates = ref(false);
 const startDate = ref('');
 const endDate = ref('');
 const inviteCode = ref('');
-const groups = ref([]);
 
 const checkUser = () => {
   const storedUser = localStorage.getItem('user');
@@ -143,28 +164,51 @@ const checkUser = () => {
 onMounted(() => {
   checkUser();
   window.addEventListener('user-changed', checkUser);
+
+  if (route.params.inviteCode) {
+    inviteCode.value = route.params.inviteCode;
+    if (user.value) {
+      joinGroup().then(id => {
+        if (id) router.push(`/group/${id}`);
+      });
+    } else {
+      showToast('請先輸入暱稱進入系統，將自動幫您加入群組！', 'info');
+    }
+  }
 });
 
 onUnmounted(() => {
   window.removeEventListener('user-changed', checkUser);
 });
 
-const login = async () => {
-  if (!username.value) return;
+const authAction = async () => {
+  if (!username.value || !password.value) return;
   loading.value = true;
   try {
-    const data = await apiClient.post('/login', { username: username.value });
+    const endpoint = isLoginMode.value ? '/auth/login' : '/auth/register';
+    const data = await apiClient.post(endpoint, { username: username.value, password: password.value });
     if (data.user) {
       localStorage.setItem('user', JSON.stringify(data.user));
       user.value = data.user;
       window.dispatchEvent(new Event('user-changed'));
-      fetchGroups();
-      showToast('登入成功！', 'success');
+      
+      if (inviteCode.value && route.params.inviteCode) {
+        const joinedGroupId = await joinGroup();
+        if (joinedGroupId) {
+          router.push(`/group/${joinedGroupId}`);
+        } else {
+          router.push('/');
+        }
+      } else {
+        fetchGroups();
+      }
+      
+      showToast(isLoginMode.value ? '登入成功！' : '註冊成功！', 'success');
     } else {
-      showToast(data.error || '登入失敗', 'error');
+      showToast(data.error || '操作失敗', 'error');
     }
   } catch (error) {
-    console.error('Login error', error);
+    console.error('Auth error', error);
     showToast('無法連線到伺服器，請確認後端已啟動。', 'error');
   } finally {
     loading.value = false;
@@ -240,19 +284,22 @@ const createGroup = async () => {
 };
 
 const joinGroup = async () => {
-  if (!inviteCode.value) return;
+  if (!inviteCode.value) return null;
   try {
     const data = await apiClient.post('/groups/join', { inviteCode: inviteCode.value.toUpperCase(), userId: user.value.id });
     if (data.error) {
       showToast(data.error, 'error');
+      return null;
     } else if (data.group) {
       inviteCode.value = '';
       fetchGroups();
       showToast('成功加入群組！', 'success');
+      return data.group.id;
     }
   } catch (error) {
     console.error('Join group error', error);
     showToast('加入群組失敗，請確認網路連線。', 'error');
+    return null;
   }
 };
 
@@ -294,13 +341,22 @@ const copyCode = (code) => {
   font-size: 4rem;
   line-height: 1.2;
   margin-bottom: 24px;
+  animation: fadeUp 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  opacity: 0;
+  transform: translateY(20px);
 }
 
-.gradient-text {
-  background: linear-gradient(to right, var(--primary), var(--secondary));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+@keyframes fadeUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.hero-title {
+  font-size: 3rem;
+  line-height: 1.2;
+  margin-bottom: 24px;
 }
 
 .hero-subtitle {
@@ -375,7 +431,37 @@ const copyCode = (code) => {
 
 .empty-state {
   text-align: center;
+  padding: 32px;
   color: var(--text-muted);
-  padding: 40px;
+}
+
+.active-tab {
+  color: var(--text-main);
+  font-weight: 700;
+}
+
+.inactive-tab {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.auth-tabs {
+  border-bottom: 2px solid rgba(255, 255, 255, 0.05);
+}
+
+.tab-indicator {
+  position: absolute;
+  bottom: -2px;
+  width: 40px;
+  height: 3px;
+  background: var(--primary);
+  border-radius: 3px;
+  transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (max-width: 600px) {
+  .hero-title {
+    font-size: 2rem;
+  }
 }
 </style>

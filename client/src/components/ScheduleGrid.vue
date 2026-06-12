@@ -410,4 +410,33 @@ const handleCellClick = (dayIdx, periodIdx) => {
   font-size: 0.9rem;
   color: var(--text-muted);
 }
+
+@media (max-width: 768px) {
+  .grid-header, .grid-row {
+    min-width: 100%; /* 取消強制 700px，讓它自適應手機寬度 */
+  }
+  .time-col-header, .time-col {
+    width: 35px;
+    font-size: 0.75rem;
+  }
+  .time-col {
+    height: 32px;
+  }
+  .day-header {
+    font-size: 0.8rem;
+    padding: 8px 0;
+    margin: 0 1px;
+  }
+  .grid-cell {
+    height: 32px;
+    margin: 1px;
+    border-radius: 4px;
+  }
+  .heatmap-count {
+    font-size: 0.7rem;
+  }
+  .crown-icon {
+    font-size: 0.9rem;
+  }
+}
 </style>

@@ -180,4 +180,25 @@ const logout = () => {
 :root[data-theme="light"] .user-badge {
   background: rgba(79, 70, 229, 0.1);
 }
+
+@media (max-width: 768px) {
+  .navbar {
+    padding: 12px 16px;
+    margin: 12px;
+    border-radius: 20px;
+    position: static;
+  }
+  .nav-container {
+    flex-direction: column;
+    gap: 12px;
+  }
+  .nav-links {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+  }
+  .logo .text {
+    font-size: 1.2rem;
+  }
+}
 </style>

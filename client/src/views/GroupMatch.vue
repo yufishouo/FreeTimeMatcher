@@ -846,4 +846,36 @@ const downloadImage = async () => {
 }
 .py-4 { padding-top: 16px; padding-bottom: 16px; }
 .mb-8 { margin-bottom: 32px; }
+
+@media (max-width: 768px) {
+  .header-section {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .group-title {
+    font-size: 1.8rem;
+  }
+  .header-actions {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .reco-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .reco-card button {
+    width: 100%;
+  }
+  .legend-items {
+    gap: 8px;
+  }
+  .legend-item {
+    font-size: 0.75rem;
+  }
+  .export-wrapper {
+    padding: 8px;
+  }
+}
 </style>

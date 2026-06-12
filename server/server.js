@@ -357,19 +357,19 @@ app.post('/api/messages/:messageId/vote', asyncHandler(async (req, res) => {
   res.json({ success: true, payload: newPayloadStr });
 }));
 
+// Vue Router fallback: Catch all non-API routes and serve index.html
+app.use((req, res, next) => {
+  if (!req.path.startsWith('/api')) {
+    res.sendFile(path.join(__dirname, '../client/dist/index.html'));
+  } else {
+    next();
+  }
+});
+
 // Error handler
 app.use((err, req, res, next) => {
   console.error(err);
   res.status(500).json({ error: err.message });
-});
-
-// Vue Router fallback: Catch all non-API routes and serve index.html
-app.get('*', (req, res) => {
-  if (!req.path.startsWith('/api')) {
-    res.sendFile(path.join(__dirname, '../client/dist/index.html'));
-  } else {
-    res.status(404).json({ error: 'API endpoint not found' });
-  }
 });
 
 const PORT = process.env.PORT || 3000;

@@ -17,9 +17,9 @@
     <div class="paint-palette-container glass-panel mt-4 mb-4">
       <h4>🎨 智慧畫筆模式：點選下方狀態後，在課表上直接拖曳即可快速塗繪。</h4>
       <div class="paint-palette mt-2">
-        <button class="btn" :class="{'btn-active': paintColor === 2}" style="background: rgba(16, 185, 129, 0.4); border-color: rgba(16, 185, 129, 0.8);" @click="paintColor = 2">✅ 有空</button>
-        <button class="btn" :class="{'btn-active': paintColor === 1}" style="background: rgba(245, 158, 11, 0.4); border-color: rgba(245, 158, 11, 0.8);" @click="paintColor = 1">⚠️ 盡量不要</button>
-        <button class="btn" :class="{'btn-active': paintColor === 0}" style="background: rgba(239, 68, 68, 0.4); border-color: rgba(239, 68, 68, 0.8);" @click="paintColor = 0">❌ 沒空</button>
+        <button class="btn paint-btn free" :class="{'active': paintColor === 2}" @click="paintColor = 2">✅ 有空</button>
+        <button class="btn paint-btn warn" :class="{'active': paintColor === 1}" @click="paintColor = 1">⚠️ 盡量不要</button>
+        <button class="btn paint-btn busy" :class="{'active': paintColor === 0}" @click="paintColor = 0">❌ 沒空</button>
       </div>
     </div>
 
@@ -101,6 +101,64 @@ const saveSchedule = async () => {
 </script>
 
 <style scoped>
+.header-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.paint-palette {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.paint-btn {
+  opacity: 0.7;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 2px solid transparent;
+}
+
+.paint-btn:hover {
+  opacity: 0.9;
+  transform: translateY(-2px);
+}
+
+.paint-btn.active {
+  opacity: 1;
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.paint-btn.free {
+  background: rgba(16, 185, 129, 0.2);
+  color: var(--text-main);
+}
+.paint-btn.free.active {
+  background: rgba(16, 185, 129, 0.4);
+  border-color: var(--success);
+}
+
+.paint-btn.warn {
+  background: rgba(245, 158, 11, 0.2);
+  color: var(--text-main);
+}
+.paint-btn.warn.active {
+  background: rgba(245, 158, 11, 0.4);
+  border-color: var(--warning);
+}
+
+.paint-btn.busy {
+  background: rgba(239, 68, 68, 0.2);
+  color: var(--text-main);
+}
+.paint-btn.busy.active {
+  background: rgba(239, 68, 68, 0.4);
+  border-color: var(--danger);
+}
+</style>
 .mt-4 { margin-top: 16px; }
 .mt-8 { margin-top: 32px; }
 .text-center { text-align: center; }

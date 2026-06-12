@@ -63,7 +63,7 @@
             <div style="display: flex; gap: 16px; align-items: center;">
               <div class="reco-medal">{{ idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '🎖️' }}</div>
               <div class="reco-info">
-                <h4>星期{{ rt.dayStr }} 第 {{ rt.periodStr }} 節</h4>
+                <h4>{{ group.is_specific_dates ? rt.dayStr : '星期' + rt.dayStr }} 第 {{ rt.periodStr }} 節</h4>
                 <p :class="rt.count >= totalWeight ? 'text-success' : 'text-warning'">綜合契合度分數 {{ rt.count }} / {{ totalWeight }}</p>
               </div>
             </div>
@@ -134,9 +134,9 @@
         </div>
         
         <div class="paint-palette mt-2 mb-4" style="display: flex; gap: 16px;">
-          <button class="btn btn-sm" :class="{'btn-primary': editPaintColor === 2}" style="background: rgba(16, 185, 129, 0.4); border-color: rgba(16, 185, 129, 0.8);" @click="editPaintColor = 2">✅ 有空</button>
-          <button class="btn btn-sm" :class="{'btn-primary': editPaintColor === 1}" style="background: rgba(245, 158, 11, 0.4); border-color: rgba(245, 158, 11, 0.8);" @click="editPaintColor = 1">⚠️ 盡量不要</button>
-          <button class="btn btn-sm" :class="{'btn-primary': editPaintColor === 0}" style="background: rgba(239, 68, 68, 0.4); border-color: rgba(239, 68, 68, 0.8);" @click="editPaintColor = 0">❌ 沒空</button>
+          <button class="btn paint-btn free" :class="{'active': editPaintColor === 2}" @click="editPaintColor = 2">✅ 有空</button>
+          <button class="btn paint-btn warn" :class="{'active': editPaintColor === 1}" @click="editPaintColor = 1">⚠️ 盡量不要</button>
+          <button class="btn paint-btn busy" :class="{'active': editPaintColor === 0}" @click="editPaintColor = 0">❌ 沒空</button>
         </div>
 
         <ScheduleGrid 
@@ -424,16 +424,17 @@ const sendMessage = async () => {
 };
 
 const createPoll = async (rt) => {
+  const dayLabel = group.value.is_specific_dates ? rt.dayStr : `星期${rt.dayStr}`;
   const pollData = {
     options: [
-      { text: `星期${rt.dayStr} 第 ${rt.periodStr} 節 好嗎？`, voters: [] },
+      { text: `${dayLabel} 第 ${rt.periodStr} 節 好嗎？`, voters: [] },
       { text: `我沒空 / 時間不行`, voters: [] }
     ]
   };
   try {
     await apiClient.post(`/groups/${route.params.id}/messages`, {
       userId: currentUser.value.id,
-      message: `發起了開會時間投票：星期${rt.dayStr} 第 ${rt.periodStr} 節`,
+      message: `發起了開會時間投票：${dayLabel} 第 ${rt.periodStr} 節`,
       type: 'poll',
       payload: JSON.stringify(pollData)
     });
@@ -600,7 +601,9 @@ const downloadImage = async () => {
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  white-space: nowrap;
+  white-space: normal;
+  line-height: 1.2;
+  word-break: break-word;
 }
 
 .flex-align-center {

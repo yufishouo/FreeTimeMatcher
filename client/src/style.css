@@ -251,6 +251,58 @@ p {
   box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.2);
 }
 
+
+
+/* Paint Palette Utilities */
+.paint-palette {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.paint-btn {
+  opacity: 0.7;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 2px solid transparent;
+}
+
+.paint-btn:hover {
+  opacity: 0.9;
+  transform: translateY(-2px);
+}
+
+.paint-btn.active {
+  opacity: 1;
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.paint-btn.free {
+  background: rgba(16, 185, 129, 0.2);
+  color: var(--text-main);
+}
+.paint-btn.free.active {
+  background: rgba(16, 185, 129, 0.4);
+  border-color: var(--success);
+}
+
+.paint-btn.warn {
+  background: rgba(245, 158, 11, 0.2);
+  color: var(--text-main);
+}
+.paint-btn.warn.active {
+  background: rgba(245, 158, 11, 0.4);
+  border-color: var(--warning);
+}
+
+.paint-btn.busy {
+  background: rgba(239, 68, 68, 0.2);
+  color: var(--text-main);
+}
+.paint-btn.busy.active {
+  background: rgba(239, 68, 68, 0.4);
+  border-color: var(--danger);
+}
 .form-label {
   display: block;
   font-size: 0.9rem;

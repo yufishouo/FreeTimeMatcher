@@ -1,13 +1,11 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import Home from '../views/Home.vue'
-import Profile from '../views/Profile.vue'
-import GroupMatch from '../views/GroupMatch.vue'
 
 const routes = [
-  { path: '/', component: Home },
-  { path: '/join/:inviteCode', component: Home },
-  { path: '/profile', component: Profile },
-  { path: '/group/:id', component: GroupMatch }
+  { path: '/', component: () => import('../views/Home.vue') },
+  { path: '/join/:inviteCode', component: () => import('../views/Home.vue') },
+  { path: '/profile', component: () => import('../views/Profile.vue') },
+  { path: '/group/:id', component: () => import('../views/GroupMatch.vue') },
+  { path: '/:pathMatch(.*)*', component: () => import('../views/NotFound.vue') }
 ]
 
 const router = createRouter({

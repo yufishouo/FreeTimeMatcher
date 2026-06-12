@@ -1,8 +1,17 @@
 const sqlite3 = require('sqlite3').verbose();
 const { open } = require('sqlite');
 const path = require('path');
+const fs = require('fs');
 
-const dbPath = path.resolve(__dirname, 'database.sqlite');
+let dbDir = __dirname;
+// Detect Azure App Service environment
+if (process.env.HOME && process.env.WEBSITE_SITE_NAME) {
+  dbDir = path.join(process.env.HOME, 'data');
+  if (!fs.existsSync(dbDir)) {
+    fs.mkdirSync(dbDir, { recursive: true });
+  }
+}
+const dbPath = path.resolve(dbDir, 'database.sqlite');
 let dbInstance = null;
 
 async function setupDB() {

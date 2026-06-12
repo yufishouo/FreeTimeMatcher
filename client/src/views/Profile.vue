@@ -158,7 +158,6 @@ const saveSchedule = async () => {
   background: rgba(239, 68, 68, 0.4);
   border-color: var(--danger);
 }
-</style>
 .mt-4 { margin-top: 16px; }
 .mt-8 { margin-top: 32px; }
 .text-center { text-align: center; }

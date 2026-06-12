@@ -3,6 +3,7 @@ const cors = require('cors');
 const http = require('http');
 const { Server } = require('socket.io');
 const { setupDB, getDB } = require('./db');
+const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
@@ -19,6 +20,9 @@ io.on('connection', (socket) => {
 });
 app.use(cors());
 app.use(express.json());
+
+// Serve static frontend files
+app.use(express.static(path.join(__dirname, '../client/dist')));
 
 // Helper to handle async routes
 const asyncHandler = fn => (req, res, next) => {
@@ -357,6 +361,15 @@ app.post('/api/messages/:messageId/vote', asyncHandler(async (req, res) => {
 app.use((err, req, res, next) => {
   console.error(err);
   res.status(500).json({ error: err.message });
+});
+
+// Vue Router fallback: Catch all non-API routes and serve index.html
+app.get('*', (req, res) => {
+  if (!req.path.startsWith('/api')) {
+    res.sendFile(path.join(__dirname, '../client/dist/index.html'));
+  } else {
+    res.status(404).json({ error: 'API endpoint not found' });
+  }
 });
 
 const PORT = process.env.PORT || 3000;

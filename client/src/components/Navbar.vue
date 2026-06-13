@@ -7,13 +7,14 @@
       </router-link>
       
       <div class="nav-links">
-        <button @click="toggleTheme" class="btn btn-outline btn-sm" title="切換深/淺色主題" style="margin-right: 8px;">
-          {{ isDark ? '🌞' : '🌛' }}
-        </button>
         <template v-if="user">
           <router-link to="/" class="nav-item">🏠 群組首頁</router-link>
-          <router-link to="/profile" class="nav-item">📅 我的課表</router-link>
-          <span class="user-badge">Hi, {{ user.username }}</span>
+          <router-link to="/profile" class="nav-item">📅 個人資訊</router-link>
+          <div class="user-badge" style="display: flex; align-items: center; gap: 8px;">
+            <img v-if="user.avatar_style === 'custom' && user.avatar_url" :src="user.avatar_url" alt="Avatar" style="width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--primary); object-fit: cover;" />
+            <img v-else :src="`https://api.dicebear.com/9.x/${user.avatar_style === 'custom' ? 'notionists' : user.avatar_style || 'notionists'}/svg?seed=${user.username}&backgroundColor=b6e3f4,c0aede,d1d4f9`" alt="Avatar" style="width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--primary); object-fit: cover;" />
+            <span>{{ user.display_name || user.username }}</span>
+          </div>
           <button @click="logout" class="btn btn-outline btn-sm">登出</button>
         </template>
       </div>
@@ -22,36 +23,30 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch, onUnmounted } from 'vue';
-import { useRouter, useRoute } from 'vue-router';
+import { ref, onMounted, onUnmounted } from 'vue';
+import { useRouter } from 'vue-router';
 
 const user = ref(null);
-const isDark = ref(true);
 const router = useRouter();
-const route = useRoute();
-
-const toggleTheme = () => {
-  isDark.value = !isDark.value;
-  const theme = isDark.value ? 'dark' : 'light';
-  document.documentElement.setAttribute('data-theme', theme);
-  localStorage.setItem('theme', theme);
-};
 
 const checkTheme = () => {
-  const storedTheme = localStorage.getItem('theme');
-  if (storedTheme === 'light') {
-    isDark.value = false;
-    document.documentElement.setAttribute('data-theme', 'light');
-  } else {
-    isDark.value = true;
-    document.documentElement.removeAttribute('data-theme');
+  const storedUser = localStorage.getItem('user');
+  if (storedUser && storedUser !== 'undefined') {
+    try {
+      const u = JSON.parse(storedUser);
+      if (u.theme_color) {
+        document.documentElement.setAttribute('data-theme', u.theme_color);
+      }
+    } catch(e) {}
   }
 };
 
 const checkUser = () => {
   const storedUser = localStorage.getItem('user');
-  if (storedUser) {
-    user.value = JSON.parse(storedUser);
+  if (storedUser && storedUser !== 'undefined') {
+    try {
+      user.value = JSON.parse(storedUser);
+    } catch(e) {}
   } else {
     user.value = null;
   }
@@ -66,8 +61,6 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('user-changed', checkUser);
 });
-
-watch(route, checkUser);
 
 const logout = () => {
   localStorage.removeItem('user');

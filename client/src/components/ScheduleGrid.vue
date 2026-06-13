@@ -431,6 +431,7 @@ const handleCellClick = (dayIdx, periodIdx) => {
     height: 32px;
     margin: 1px;
     border-radius: 4px;
+    min-width: 35px;
   }
   .heatmap-count {
     font-size: 0.7rem;

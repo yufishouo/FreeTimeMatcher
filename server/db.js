@@ -19,8 +19,30 @@ async function setupDB() {
   await pool.query(`CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     username VARCHAR(255) UNIQUE NOT NULL,
-    password VARCHAR(255) NOT NULL
+    password VARCHAR(255) NOT NULL,
+    display_name VARCHAR(255)
   )`);
+  
+  // Upgrade script for existing users table
+  const newColumns = [
+    'display_name VARCHAR(255)',
+    'avatar_style VARCHAR(50) DEFAULT \'notionists\'',
+    'status_message VARCHAR(255)',
+    'contact_line VARCHAR(100)',
+    'contact_discord VARCHAR(100)',
+    'contact_ig VARCHAR(100)',
+    'theme_color VARCHAR(50) DEFAULT \'default\'',
+    'quiet_hours_data TEXT',
+    'avatar_url TEXT'
+  ];
+
+  for (const col of newColumns) {
+    try {
+      await pool.query(`ALTER TABLE users ADD COLUMN ${col}`);
+    } catch (e) {
+      // Column might already exist
+    }
+  }
 
   await pool.query(`CREATE TABLE IF NOT EXISTS groups (
     id SERIAL PRIMARY KEY,

@@ -32,27 +32,61 @@
   --shadow-glow: 0 0 20px rgba(99, 102, 241, 0.4);
 }
 
+:root[data-theme="sakura"] {
+  --primary: #f472b6;
+  --primary-hover: #ec4899;
+  --secondary: #fb7185;
+  --mesh-1: #2a0f1d;
+  --mesh-2: #4a1532;
+  --mesh-3: #701a45;
+  --mesh-4: #8b2252;
+  --mesh-5: #1c0512;
+  --glass-bg: rgba(42, 15, 29, 0.4);
+  --shadow-glow: 0 0 20px rgba(244, 114, 182, 0.4);
+}
+
+:root[data-theme="ocean"] {
+  --primary: #0ea5e9;
+  --primary-hover: #0284c7;
+  --secondary: #38bdf8;
+  --mesh-1: #0f1c2a;
+  --mesh-2: #16364a;
+  --mesh-3: #1a5170;
+  --mesh-4: #1d729b;
+  --mesh-5: #050b12;
+  --glass-bg: rgba(15, 28, 42, 0.4);
+  --shadow-glow: 0 0 20px rgba(14, 165, 233, 0.4);
+}
+
+:root[data-theme="mint"] {
+  --primary: #10b981;
+  --primary-hover: #059669;
+  --secondary: #34d399;
+  --mesh-1: #0f2a20;
+  --mesh-2: #154a36;
+  --mesh-3: #1a7051;
+  --mesh-4: #228b64;
+  --mesh-5: #05120e;
+  --glass-bg: rgba(15, 42, 32, 0.4);
+  --shadow-glow: 0 0 20px rgba(16, 185, 129, 0.4);
+}
+
 :root[data-theme="light"] {
   --primary: #4f46e5;
   --primary-hover: #4338ca;
   --secondary: #db2777;
-  
-  /* Light Pastel Mesh Gradient Colors */
   --mesh-1: #f8fafc;
   --mesh-2: #e0e7ff;
   --mesh-3: #fce7f3;
   --mesh-4: #ede9fe;
   --mesh-5: #f1f5f9;
-  
   --glass-bg: rgba(255, 255, 255, 0.6);
   --glass-bg-hover: rgba(255, 255, 255, 0.8);
   --glass-border: rgba(255, 255, 255, 0.8);
   --glass-highlight: rgba(255, 255, 255, 1);
-  
   --text-main: #0f172a;
-  --text-muted: #64748b;
+  --text-muted: #475569;
   --text-inverse: #f8fafc;
-  
   --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
   --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025);
   --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);

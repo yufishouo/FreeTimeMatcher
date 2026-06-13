@@ -16,23 +16,25 @@
               <h2 class="group-title">{{ group.name }}</h2>
               <span class="invite-badge">邀請碼: {{ group.invite_code }}</span>
             </div>
-            <div class="member-list" style="display: flex; gap: 8px; flex-wrap: wrap;">
-              <div v-for="m in members" :key="m.id" class="member-tag glass-panel-inner">
+            <div class="member-list" style="display: flex; gap: 12px; flex-wrap: wrap;">
+              <div v-for="m in members" :key="m.id" class="member-tag glass-panel-inner" @click="showMemberInfo(m)" style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 20px;">
+                <img v-if="m.avatar_style === 'custom' && m.avatar_url" :src="m.avatar_url" alt="Avatar" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover;" />
+                <img v-else :src="`https://api.dicebear.com/9.x/${m.avatar_style === 'custom' ? 'notionists' : m.avatar_style || 'notionists'}/svg?seed=${m.login_username || m.username}&backgroundColor=b6e3f4,c0aede,d1d4f9`" alt="Avatar" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover;" />
                 <span class="member-name">{{ m.username }}</span>
                 <span v-if="m.id === group.creator_id" title="管理員">👑</span>
                 <span v-else-if="m.role === 'subadmin'" title="副管理員">🛡️</span>
                 <template v-if="isAdmin">
-                  <select v-model="m.weight" @change="changeWeight(m.id, m.weight)" class="mini-select">
+                  <select v-model="m.weight" @click.stop @change="changeWeight(m.id, m.weight)" class="mini-select">
                     <option :value="1">權重 1</option>
                     <option :value="2">權重 2</option>
                     <option :value="5">權重 5</option>
                     <option :value="10">權重 10</option>
                   </select>
-                  <select v-if="isCreator && m.id !== group.creator_id" v-model="m.role" @change="toggleRole(m)" class="mini-select">
+                  <select v-if="isCreator && m.id !== group.creator_id" @click.stop v-model="m.role" @change="toggleRole(m)" class="mini-select">
                     <option value="member">一般成員</option>
                     <option value="subadmin">副管理員</option>
                   </select>
-                  <button v-if="isCreator && m.id !== currentUser.id" @click="kickMember(m.id)" class="kick-btn" title="移除成員">✖</button>
+                  <button v-if="isCreator && m.id !== currentUser.id" @click.stop="kickMember(m.id)" class="kick-btn" title="移除成員">✖</button>
                 </template>
                 <template v-else-if="m.weight > 1">
                   <span class="text-warning weight-display">(權重: {{ m.weight }})</span>
@@ -44,7 +46,7 @@
           <div class="header-actions" style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: flex-end; flex: 1 1 400px;">
             <button v-if="isCreator" @click="deleteGroup" class="btn btn-outline" style="color: var(--danger); border-color: rgba(239, 68, 68, 0.5); white-space: nowrap;">🗑️ 刪除群組</button>
             <button v-else @click="leaveGroup" class="btn btn-outline" style="color: var(--danger); border-color: rgba(239, 68, 68, 0.5); white-space: nowrap;">🚪 退出群組</button>
-            <button v-if="group.is_specific_dates" @click="showEditModal = true" class="btn btn-primary" style="white-space: nowrap; box-shadow: 0 0 15px rgba(99,102,241,0.5);">✏️ 填寫群組課表</button>
+            <button @click="showEditModal = true" class="btn btn-primary" style="white-space: nowrap; box-shadow: 0 0 15px rgba(99,102,241,0.5);">✏️ 填寫群組課表</button>
             <button @click="refreshMatch" class="btn btn-outline" style="white-space: nowrap;">🔄 重整</button>
             <button @click="copyInviteLink" class="btn btn-outline" style="white-space: nowrap;">🔗 邀請</button>
             <button @click="downloadImage" class="btn btn-outline" :disabled="downloading" style="white-space: nowrap;">📸 截圖</button>
@@ -103,16 +105,22 @@
       <div class="mt-4 chat-section glass-panel mb-8">
         <h3 class="mb-3">💬 群組討論區</h3>
         <div class="chat-messages" ref="chatContainer">
-          <div v-for="msg in messages" :key="msg.id" class="message-bubble" :class="{'my-message': msg.username === currentUser.username}">
-            <div class="message-sender">{{ msg.username }} <span class="message-time">{{ new Date(msg.created_at).toLocaleTimeString() }}</span></div>
-            <div class="message-text">{{ msg.message }}</div>
-            
-            <div v-if="msg.type === 'poll'" class="poll-container mt-2" style="background: rgba(0,0,0,0.2); padding: 8px; border-radius: 8px;">
-              <div v-for="(opt, oIdx) in (msg.parsedPayload?.options || [])" :key="oIdx" class="poll-option mb-2">
-                <button @click="votePoll(msg.id, oIdx)" class="btn btn-sm" style="width: 100%; text-align: left; display: flex; justify-content: space-between;" :class="(opt.voters || []).includes(currentUser.id) ? 'btn-primary' : 'btn-outline'">
-                  <span>{{ opt.text }}</span>
-                  <span>{{ (opt.voters || []).length }} 票</span>
-                </button>
+          <div v-for="msg in messages" :key="msg.id" class="message-bubble" :class="{'my-message': msg.login_username === currentUser.username}">
+            <div style="display: flex; gap: 8px; align-items: flex-start; margin-bottom: 4px;">
+              <img v-if="msg.avatar_style === 'custom' && msg.avatar_url" :src="msg.avatar_url" alt="Avatar" style="width: 28px; height: 28px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.2); object-fit: cover;" />
+              <img v-else :src="`https://api.dicebear.com/9.x/${msg.avatar_style === 'custom' ? 'notionists' : msg.avatar_style || 'notionists'}/svg?seed=${msg.login_username}&backgroundColor=b6e3f4,c0aede,d1d4f9`" alt="Avatar" style="width: 28px; height: 28px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.2); object-fit: cover;" />
+              <div style="flex: 1;">
+                <div class="message-sender">{{ msg.username }} <span class="message-time">{{ new Date(msg.created_at).toLocaleTimeString() }}</span></div>
+                <div class="message-text">{{ msg.message }}</div>
+                
+                <div v-if="msg.type === 'poll'" class="poll-container mt-2" style="background: rgba(0,0,0,0.2); padding: 8px; border-radius: 8px;">
+                  <div v-for="(opt, oIdx) in (msg.parsedPayload?.options || [])" :key="oIdx" class="poll-option mb-2">
+                    <button @click="votePoll(msg.id, oIdx)" class="btn btn-sm" style="width: 100%; text-align: left; display: flex; justify-content: space-between;" :class="(opt.voters || []).includes(currentUser.id) ? 'btn-primary' : 'btn-outline'">
+                      <span>{{ opt.text }}</span>
+                      <span>{{ (opt.voters || []).length }} 票</span>
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -152,6 +160,31 @@
         </div>
       </div>
     </div>
+    <!-- 成員資訊彈窗 -->
+    <div v-if="selectedMember" class="modal-overlay" @click.self="selectedMember = null">
+      <div class="modal-content glass-panel" style="max-width: 400px; text-align: center;">
+        <div class="modal-header">
+          <h3>👤 成員資訊</h3>
+          <button class="close-btn" @click="selectedMember = null">✖</button>
+        </div>
+        <div class="modal-body" style="display: flex; flex-direction: column; align-items: center; gap: 16px;">
+          <img v-if="selectedMember.avatar_style === 'custom' && selectedMember.avatar_url" :src="selectedMember.avatar_url" alt="Avatar" style="width: 100px; height: 100px; border-radius: 50%; border: 4px solid var(--primary); object-fit: cover;" />
+          <img v-else :src="`https://api.dicebear.com/9.x/${selectedMember.avatar_style === 'custom' ? 'notionists' : selectedMember.avatar_style || 'notionists'}/svg?seed=${selectedMember.login_username || selectedMember.username}&backgroundColor=b6e3f4,c0aede,d1d4f9`" alt="Avatar" style="width: 100px; height: 100px; border-radius: 50%; border: 4px solid var(--primary); object-fit: cover;" />
+          <h2 style="margin: 0;">{{ selectedMember.username }}</h2>
+          <p v-if="selectedMember.status_message" style="color: var(--text-muted); font-style: italic;">"{{ selectedMember.status_message }}"</p>
+          
+          <div style="width: 100%; text-align: left; background: rgba(0,0,0,0.2); padding: 16px; border-radius: 8px; margin-top: 8px;">
+            <p v-if="selectedMember.contact_line"><strong>LINE:</strong> {{ selectedMember.contact_line }}</p>
+            <p v-if="selectedMember.contact_discord"><strong>Discord:</strong> {{ selectedMember.contact_discord }}</p>
+            <p v-if="selectedMember.contact_ig"><strong>IG:</strong> {{ selectedMember.contact_ig }}</p>
+            <p v-if="!selectedMember.contact_line && !selectedMember.contact_discord && !selectedMember.contact_ig" style="color: var(--text-muted);">此成員尚未設定聯絡方式</p>
+          </div>
+        </div>
+        <div class="modal-footer" style="margin-top: 16px;">
+          <button class="btn btn-outline w-full" @click="selectedMember = null">關閉</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -164,14 +197,20 @@ import ScheduleGrid from '../components/ScheduleGrid.vue';
 import { showToast } from '../toastState.js';
 import { apiClient, SOCKET_URL } from '../api.js';
 
-const router = useRouter();
 const route = useRoute();
+const router = useRouter();
 
-const loading = ref(true);
+const groupId = route.params.id;
+const currentUser = ref(null);
 const group = ref(null);
 const members = ref([]);
-const currentUser = ref(null);
+const loading = ref(true);
 const socket = ref(null);
+const selectedMember = ref(null);
+
+const showMemberInfo = (member) => {
+  selectedMember.value = member;
+};
 
 const isCreator = computed(() => {
   return group.value && currentUser.value && group.value.creator_id === currentUser.value.id;
@@ -204,11 +243,16 @@ const myGroupSchedule = ref([]);
 
 onMounted(() => {
   const storedUser = localStorage.getItem('user');
-  if (!storedUser) {
+  if (!storedUser || storedUser === 'undefined') {
     router.push('/');
     return;
   }
-  currentUser.value = JSON.parse(storedUser);
+  try {
+    currentUser.value = JSON.parse(storedUser);
+  } catch(e) {
+    router.push('/');
+    return;
+  }
   fetchGroupMatch();
   fetchMessages();
 
@@ -227,7 +271,7 @@ onMounted(() => {
     messages.value.push(msg);
     scrollToBottom();
     
-    if (msg.username !== currentUser.value?.username) {
+    if (msg.login_username !== currentUser.value?.username) {
       playNotificationSound();
     }
   });
@@ -469,9 +513,11 @@ const refreshMatch = () => {
 
 const customDays = computed(() => {
   if (!group.value || !group.value.is_specific_dates) return ['一', '二', '三', '四', '五', '六', '日'];
-  const start = new Date(group.value.start_date);
-  const end = new Date(group.value.end_date);
-  const diffDays = Math.ceil(Math.abs(end - start) / (1000 * 60 * 60 * 24)) + 1;
+  const [sy, sm, sd] = group.value.start_date.split('-');
+  const [ey, em, ed] = group.value.end_date.split('-');
+  const start = new Date(sy, sm - 1, sd);
+  const end = new Date(ey, em - 1, ed);
+  const diffDays = Math.round(Math.abs(end - start) / (1000 * 60 * 60 * 24)) + 1;
   const arr = [];
   for (let i = 0; i < diffDays; i++) {
     const d = new Date(start);
@@ -859,6 +905,13 @@ const downloadImage = async () => {
   .header-actions {
     flex-wrap: wrap;
     gap: 8px;
+    justify-content: flex-start !important;
+  }
+  .header-actions .btn {
+    flex: 1 1 45%;
+    padding: 8px;
+    font-size: 0.85rem;
+    justify-content: center;
   }
   .reco-card {
     flex-direction: column;

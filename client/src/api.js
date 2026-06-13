@@ -1,13 +1,27 @@
 export const API_BASE_URL = import.meta.env.PROD ? '/api' : 'http://localhost:3000/api';
 export const SOCKET_URL = import.meta.env.PROD ? '' : 'http://localhost:3000';
 
+const handleResponse = async (res) => {
+  if (!res.ok) {
+    let errorMsg = `API Error: ${res.statusText}`;
+    try {
+      const errorData = await res.json();
+      if (errorData.error) errorMsg = errorData.error;
+    } catch(e) {}
+    
+    if (res.status === 401) {
+      window.dispatchEvent(new CustomEvent('auth-error', { detail: errorMsg }));
+    }
+    
+    return { error: errorMsg };
+  }
+  return res.json();
+};
+
 export const apiClient = {
   async get(endpoint) {
     const res = await fetch(`${API_BASE_URL}${endpoint}`);
-    if (!res.ok) {
-      try { return await res.json(); } catch(e) { throw new Error(`API Error: ${res.statusText}`); }
-    }
-    return res.json();
+    return handleResponse(res);
   },
   async post(endpoint, data) {
     const res = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -15,10 +29,7 @@ export const apiClient = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
-    if (!res.ok) {
-      try { return await res.json(); } catch(e) { throw new Error(`API Error: ${res.statusText}`); }
-    }
-    return res.json();
+    return handleResponse(res);
   },
   async put(endpoint, data) {
     const res = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -26,10 +37,7 @@ export const apiClient = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
-    if (!res.ok) {
-      try { return await res.json(); } catch(e) { throw new Error(`API Error: ${res.statusText}`); }
-    }
-    return res.json();
+    return handleResponse(res);
   },
   async delete(endpoint, data = null) {
     const options = { method: 'DELETE' };
@@ -38,9 +46,6 @@ export const apiClient = {
       options.body = JSON.stringify(data);
     }
     const res = await fetch(`${API_BASE_URL}${endpoint}`, options);
-    if (!res.ok) {
-      try { return await res.json(); } catch(e) { throw new Error(`API Error: ${res.statusText}`); }
-    }
-    return res.json();
+    return handleResponse(res);
   }
 };

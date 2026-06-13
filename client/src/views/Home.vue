@@ -153,9 +153,11 @@ const inviteCode = ref('');
 
 const checkUser = () => {
   const storedUser = localStorage.getItem('user');
-  if (storedUser) {
-    user.value = JSON.parse(storedUser);
-    fetchGroups();
+  if (storedUser && storedUser !== 'undefined') {
+    try {
+      user.value = JSON.parse(storedUser);
+      fetchGroups();
+    } catch(e) {}
   } else {
     user.value = null;
   }
@@ -236,13 +238,15 @@ const createGroup = async () => {
       showToast('請選擇完整的日期範圍', 'error');
       return;
     }
-    const start = new Date(startDate.value);
-    const end = new Date(endDate.value);
+    const [sy, sm, sd] = startDate.value.split('-');
+    const [ey, em, ed] = endDate.value.split('-');
+    const start = new Date(sy, sm - 1, sd);
+    const end = new Date(ey, em - 1, ed);
     if (start > end) {
       showToast('結束日期不能早於開始日期', 'error');
       return;
     }
-    const diffDays = Math.ceil(Math.abs(end - start) / (1000 * 60 * 60 * 24)) + 1; 
+    const diffDays = Math.round(Math.abs(end - start) / (1000 * 60 * 60 * 24)) + 1; 
     if (diffDays > 14) {
       showToast('日期範圍最多支援 14 天', 'error');
       return;

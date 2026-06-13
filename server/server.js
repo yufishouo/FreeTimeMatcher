@@ -49,7 +49,7 @@ app.post('/api/auth/register', asyncHandler(async (req, res) => {
   const hashedPassword = await bcrypt.hash(password, salt);
 
   const result = await db.run('INSERT INTO users (username, password) VALUES (?, ?) RETURNING id', [username, hashedPassword]);
-  res.json({ user: { id: result.lastID, username } });
+  res.json({ user: { id: result.lastID, username, display_name: username } });
 }));
 
 app.post('/api/auth/login', asyncHandler(async (req, res) => {
@@ -67,9 +67,112 @@ app.post('/api/auth/login', asyncHandler(async (req, res) => {
     return res.status(400).json({ error: '密碼錯誤' });
   }
 
-  res.json({ user: { id: user.id, username: user.username } });
+  res.json({ user: { id: user.id, username: user.username, display_name: user.display_name || user.username } });
 }));
 
+// --- Profile API ---
+
+app.put('/api/users/:userId/profile', asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  const { 
+    display_name, 
+    avatar_style, 
+    avatar_url,
+    status_message, 
+    contact_line, 
+    contact_discord, 
+    contact_ig, 
+    theme_color, 
+    quiet_hours_data 
+  } = req.body;
+
+  if (display_name && display_name.trim() === '') {
+    return res.status(400).json({ error: '暱稱不能為空' });
+  }
+  if (display_name && display_name.length > 30) {
+    return res.status(400).json({ error: '暱稱不能超過 30 個字' });
+  }
+
+  const db = getDB();
+  
+  // We'll update the user dynamically based on provided fields
+  const updates = [];
+  const params = [];
+  
+  if (display_name !== undefined) { updates.push('display_name = ?'); params.push(display_name.trim()); }
+  if (avatar_style !== undefined) { updates.push('avatar_style = ?'); params.push(avatar_style); }
+  if (avatar_url !== undefined) { updates.push('avatar_url = ?'); params.push(avatar_url); }
+  if (status_message !== undefined) { updates.push('status_message = ?'); params.push(status_message); }
+  if (contact_line !== undefined) { updates.push('contact_line = ?'); params.push(contact_line); }
+  if (contact_discord !== undefined) { updates.push('contact_discord = ?'); params.push(contact_discord); }
+  if (contact_ig !== undefined) { updates.push('contact_ig = ?'); params.push(contact_ig); }
+  if (theme_color !== undefined) { updates.push('theme_color = ?'); params.push(theme_color); }
+  if (quiet_hours_data !== undefined) { updates.push('quiet_hours_data = ?'); params.push(JSON.stringify(quiet_hours_data)); }
+
+  if (updates.length > 0) {
+    params.push(userId);
+    await db.run(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, params);
+  }
+
+  // Fetch updated user to return
+  const user = await db.get('SELECT * FROM users WHERE id = ?', [userId]);
+  res.json({ success: true, user });
+}));
+// --- Stats API ---
+
+app.get('/api/users/:userId/stats', asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  const db = getDB();
+  
+  // 1. Group Count
+  const groupCountRow = await db.get('SELECT COUNT(*) as count FROM group_members WHERE user_id = ?', [userId]);
+  const groupCount = groupCountRow ? groupCountRow.count : 0;
+
+  // 2. Total Free Hours (count of state 2 in schedule)
+  const scheduleRow = await db.get('SELECT schedule_data FROM schedules WHERE user_id = ?', [userId]);
+  let freeCount = 0;
+  if (scheduleRow && scheduleRow.schedule_data) {
+    try {
+      const schedule = JSON.parse(scheduleRow.schedule_data);
+      for (let day = 0; day < 7; day++) {
+        for (let period = 0; period < 14; period++) {
+          if (schedule[day] && schedule[day][period] === 2) {
+            freeCount++;
+          }
+        }
+      }
+    } catch(e) {}
+  }
+  
+  // 3. Most Free Day
+  const dayNames = ['星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日'];
+  let mostFreeDay = '無資料';
+  if (scheduleRow && scheduleRow.schedule_data) {
+    try {
+      const schedule = JSON.parse(scheduleRow.schedule_data);
+      let maxFree = -1;
+      let maxDayIdx = -1;
+      for (let day = 0; day < 7; day++) {
+        let dayFree = 0;
+        for (let period = 0; period < 14; period++) {
+          if (schedule[day] && schedule[day][period] === 2) dayFree++;
+        }
+        if (dayFree > maxFree) {
+          maxFree = dayFree;
+          maxDayIdx = day;
+        }
+      }
+      if (maxDayIdx !== -1 && maxFree > 0) {
+        mostFreeDay = dayNames[maxDayIdx];
+      }
+    } catch(e) {}
+  }
+
+  const userRow = await db.get('SELECT * FROM users WHERE id = ?', [userId]);
+  delete userRow.password;
+
+  res.json({ stats: { groupCount, freeCount, mostFreeDay }, user: userRow });
+}));
 // --- Schedule API ---
 
 app.get('/api/schedule/:userId', asyncHandler(async (req, res) => {
@@ -144,7 +247,7 @@ app.get('/api/users/:userId/groups', asyncHandler(async (req, res) => {
   const { userId } = req.params;
   const db = getDB();
   const rows = await db.all(`
-      SELECT g.id, g.name, g.invite_code 
+      SELECT g.id, g.name, g.invite_code, g.is_specific_dates, g.start_date, g.end_date 
       FROM groups g
       JOIN group_members gm ON g.id = gm.group_id
       WHERE gm.user_id = ?
@@ -228,6 +331,17 @@ app.put('/api/groups/:groupId/members/:memberId/role', asyncHandler(async (req, 
   res.json({ success: true });
 }));
 
+app.get('/api/groups/:groupId/schedule/:userId', asyncHandler(async (req, res) => {
+  const { groupId, userId } = req.params;
+  const db = getDB();
+  const row = await db.get('SELECT schedule_data FROM group_schedules WHERE group_id = ? AND user_id = ?', [groupId, userId]);
+  if (row && row.schedule_data) {
+    res.json({ schedule: JSON.parse(row.schedule_data) });
+  } else {
+    res.json({ schedule: null });
+  }
+}));
+
 app.get('/api/groups/:groupId/match', asyncHandler(async (req, res) => {
   const { groupId } = req.params;
   const db = getDB();
@@ -235,29 +349,42 @@ app.get('/api/groups/:groupId/match', asyncHandler(async (req, res) => {
   const group = await db.get('SELECT * FROM groups WHERE id = ?', [groupId]);
   if (!group) return res.status(404).json({ error: 'Group not found' });
   
-  const scheduleQuery = group.is_specific_dates 
-    ? `SELECT u.id, u.username, gs.schedule_data, gm.weight, gm.role 
-       FROM group_members gm 
-       JOIN users u ON gm.user_id = u.id 
-       LEFT JOIN group_schedules gs ON u.id = gs.user_id AND gs.group_id = ? 
-       WHERE gm.group_id = ?`
-    : `SELECT u.id, u.username, s.schedule_data, gm.weight, gm.role 
+  const scheduleSelector = group.is_specific_dates 
+    ? 'gs.schedule_data AS schedule_data' 
+    : 'COALESCE(gs.schedule_data, s.schedule_data) AS schedule_data';
+
+  const scheduleQuery = `SELECT u.id, u.username, COALESCE(u.display_name, u.username) AS display_name, 
+       u.avatar_style, u.avatar_url, u.status_message, u.contact_line, u.contact_discord, u.contact_ig, u.quiet_hours_data,
+       ${scheduleSelector}, gm.weight, gm.role 
        FROM group_members gm 
        JOIN users u ON gm.user_id = u.id 
        LEFT JOIN schedules s ON u.id = s.user_id 
+       LEFT JOIN group_schedules gs ON u.id = gs.user_id AND gs.group_id = ? 
        WHERE gm.group_id = ?`;
 
-  const params = group.is_specific_dates ? [groupId, groupId] : [groupId];
+  const params = [groupId, groupId];
   const members = await db.all(scheduleQuery, params);
   
   const membersData = members.map(m => {
     let parsedSchedule = null;
+    let parsedQuietHours = null;
     if (m.schedule_data) {
       try { parsedSchedule = JSON.parse(m.schedule_data); } catch(e) { console.error('Parse err'); }
     }
+    if (m.quiet_hours_data) {
+      try { parsedQuietHours = JSON.parse(m.quiet_hours_data); } catch(e) {}
+    }
     return {
       id: m.id,
-      username: m.username,
+      username: m.display_name,
+      login_username: m.username,
+      avatar_style: m.avatar_style || 'notionists',
+      avatar_url: m.avatar_url || '',
+      status_message: m.status_message,
+      contact_line: m.contact_line,
+      contact_discord: m.contact_discord,
+      contact_ig: m.contact_ig,
+      quiet_hours: parsedQuietHours,
       weight: m.weight || 1,
       role: m.role || 'member',
       schedule: parsedSchedule
@@ -289,7 +416,7 @@ app.get('/api/groups/:groupId/messages', asyncHandler(async (req, res) => {
   const { groupId } = req.params;
   const db = getDB();
   const rows = await db.all(`
-    SELECT m.id, m.message, m.created_at, u.username, m.type, m.payload
+    SELECT m.id, m.message, m.created_at, COALESCE(u.display_name, u.username) AS username, u.username AS login_username, u.avatar_style, u.avatar_url, m.type, m.payload
     FROM messages m
     JOIN users u ON m.user_id = u.id
     WHERE m.group_id = ?
@@ -318,7 +445,7 @@ app.post('/api/groups/:groupId/messages', asyncHandler(async (req, res) => {
   const result = await db.run('INSERT INTO messages (group_id, user_id, message, type, payload) VALUES (?, ?, ?, ?, ?) RETURNING id', [groupId, userId, message.trim(), type, payload]);
   const msgId = result.lastID;
   const row = await db.get(`
-    SELECT m.id, m.message, m.created_at, u.username, m.type, m.payload
+    SELECT m.id, m.message, m.created_at, COALESCE(u.display_name, u.username) AS username, u.username AS login_username, u.avatar_style, u.avatar_url, m.type, m.payload
     FROM messages m
     JOIN users u ON m.user_id = u.id
     WHERE m.id = ?

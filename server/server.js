@@ -48,7 +48,7 @@ app.post('/api/auth/register', asyncHandler(async (req, res) => {
   const salt = await bcrypt.genSalt(10);
   const hashedPassword = await bcrypt.hash(password, salt);
 
-  const result = await db.run('INSERT INTO users (username, password) VALUES (?, ?)', [username, hashedPassword]);
+  const result = await db.run('INSERT INTO users (username, password) VALUES (?, ?) RETURNING id', [username, hashedPassword]);
   res.json({ user: { id: result.lastID, username } });
 }));
 
@@ -120,7 +120,7 @@ app.post('/api/groups', asyncHandler(async (req, res) => {
   const db = getDB();
   
   const result = await db.run(
-    'INSERT INTO groups (name, invite_code, is_specific_dates, start_date, end_date, creator_id) VALUES (?, ?, ?, ?, ?, ?)', 
+    'INSERT INTO groups (name, invite_code, is_specific_dates, start_date, end_date, creator_id) VALUES (?, ?, ?, ?, ?, ?) RETURNING id', 
     [name, inviteCode, is_specific_dates ? 1 : 0, start_date || null, end_date || null, userId]
   );
   const groupId = result.lastID;
@@ -136,7 +136,7 @@ app.post('/api/groups/join', asyncHandler(async (req, res) => {
   const group = await db.get('SELECT id, name FROM groups WHERE invite_code = ?', [inviteCode]);
   if (!group) return res.status(404).json({ error: '找不到該群組或邀請碼錯誤' });
   
-  await db.run('INSERT OR IGNORE INTO group_members (group_id, user_id) VALUES (?, ?)', [group.id, userId]);
+  await db.run('INSERT INTO group_members (group_id, user_id) VALUES (?, ?) ON CONFLICT DO NOTHING', [group.id, userId]);
   res.json({ group });
 }));
 
@@ -315,7 +315,7 @@ app.post('/api/groups/:groupId/messages', asyncHandler(async (req, res) => {
 
   const db = getDB();
   
-  const result = await db.run('INSERT INTO messages (group_id, user_id, message, type, payload) VALUES (?, ?, ?, ?, ?)', [groupId, userId, message.trim(), type, payload]);
+  const result = await db.run('INSERT INTO messages (group_id, user_id, message, type, payload) VALUES (?, ?, ?, ?, ?) RETURNING id', [groupId, userId, message.trim(), type, payload]);
   const msgId = result.lastID;
   const row = await db.get(`
     SELECT m.id, m.message, m.created_at, u.username, m.type, m.payload

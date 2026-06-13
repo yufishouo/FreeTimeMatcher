@@ -1,66 +1,66 @@
-const sqlite3 = require('sqlite3').verbose();
-const { open } = require('sqlite');
-const path = require('path');
-const fs = require('fs');
+require('dotenv').config();
+const { Pool } = require('pg');
 
-let dbDir = __dirname;
-// Detect Azure App Service environment
-if (process.env.HOME && process.env.WEBSITE_SITE_NAME) {
-  dbDir = path.join(process.env.HOME, 'data');
-  if (!fs.existsSync(dbDir)) {
-    fs.mkdirSync(dbDir, { recursive: true });
-  }
-}
-const dbPath = path.resolve(dbDir, 'database.sqlite');
-let dbInstance = null;
+let pool = null;
 
 async function setupDB() {
-  const db = await open({
-    filename: dbPath,
-    driver: sqlite3.Database
+  if (!process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL is not set in .env file");
+  }
+
+  pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false }
   });
 
-  console.log('Connected to the SQLite database.');
+  console.log('Connected to the PostgreSQL database on Neon.');
 
-  await db.exec('PRAGMA foreign_keys = ON;');
-
-  await db.exec(`CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE NOT NULL,
-    password TEXT NOT NULL
+  // Initialize tables
+  await pool.query(`CREATE TABLE IF NOT EXISTS users (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(255) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL
   )`);
 
-  await db.exec(`CREATE TABLE IF NOT EXISTS schedules (
+  await pool.query(`CREATE TABLE IF NOT EXISTS groups (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255),
+    invite_code VARCHAR(50) UNIQUE,
+    is_specific_dates INTEGER DEFAULT 0,
+    start_date VARCHAR(255),
+    end_date VARCHAR(255),
+    creator_id INTEGER
+  )`);
+
+  await pool.query(`CREATE TABLE IF NOT EXISTS schedules (
     user_id INTEGER PRIMARY KEY,
     schedule_data TEXT,
     FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
   )`);
 
-  await db.exec(`CREATE TABLE IF NOT EXISTS groups (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT,
-    invite_code TEXT UNIQUE
-  )`);
-
-  await db.exec(`CREATE TABLE IF NOT EXISTS group_members (
+  await pool.query(`CREATE TABLE IF NOT EXISTS group_members (
     group_id INTEGER,
     user_id INTEGER,
+    weight INTEGER DEFAULT 1,
+    role VARCHAR(50) DEFAULT 'member',
     PRIMARY KEY (group_id, user_id),
     FOREIGN KEY(group_id) REFERENCES groups(id) ON DELETE CASCADE,
     FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
   )`);
 
-  await db.exec(`CREATE TABLE IF NOT EXISTS messages (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+  await pool.query(`CREATE TABLE IF NOT EXISTS messages (
+    id SERIAL PRIMARY KEY,
     group_id INTEGER,
     user_id INTEGER,
     message TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    type VARCHAR(50) DEFAULT 'text',
+    payload TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(group_id) REFERENCES groups(id) ON DELETE CASCADE,
     FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
   )`);
 
-  await db.exec(`CREATE TABLE IF NOT EXISTS group_schedules (
+  await pool.query(`CREATE TABLE IF NOT EXISTS group_schedules (
     group_id INTEGER,
     user_id INTEGER,
     schedule_data TEXT,
@@ -70,30 +70,43 @@ async function setupDB() {
   )`);
 
   // Performance Optimization: Add Indices for frequent lookups
-  await db.exec(`CREATE INDEX IF NOT EXISTS idx_messages_group_id ON messages(group_id)`);
-  await db.exec(`CREATE INDEX IF NOT EXISTS idx_group_members_user_id ON group_members(user_id)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_messages_group_id ON messages(group_id)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_group_members_user_id ON group_members(user_id)`);
 
-  // Alter groups table (safe to fail if already exists)
-  try { await db.exec(`ALTER TABLE groups ADD COLUMN is_specific_dates INTEGER DEFAULT 0`); } catch (e) {}
-  try { await db.exec(`ALTER TABLE groups ADD COLUMN start_date TEXT`); } catch (e) {}
-  try { await db.exec(`ALTER TABLE groups ADD COLUMN end_date TEXT`); } catch (e) {}
-  try { await db.exec(`ALTER TABLE groups ADD COLUMN creator_id INTEGER`); } catch (e) {}
-
-  // Alter group_members table
-  try { await db.exec(`ALTER TABLE group_members ADD COLUMN weight INTEGER DEFAULT 1`); } catch (e) {}
-  try { await db.exec(`ALTER TABLE group_members ADD COLUMN role TEXT DEFAULT 'member'`); } catch (e) {}
-
-  // Alter messages table
-  try { await db.exec(`ALTER TABLE messages ADD COLUMN type TEXT DEFAULT 'text'`); } catch (e) {}
-  try { await db.exec(`ALTER TABLE messages ADD COLUMN payload TEXT`); } catch (e) {}
-
-  dbInstance = db;
-  return db;
+  // Simple Wrapper to make it backwards compatible with sqlite db.run, db.get, db.all
+  return getDB();
 }
 
 function getDB() {
-  if (!dbInstance) throw new Error('Database not initialized');
-  return dbInstance;
+  if (!pool) throw new Error('Database not initialized');
+  
+  // Convert '?' to '$1, $2...' on the fly
+  function convertSql(sql) {
+    let i = 1;
+    return sql.replace(/\?/g, () => `$${i++}`);
+  }
+
+  return {
+    run: async (sql, params = []) => {
+      const pgSql = convertSql(sql);
+      const res = await pool.query(pgSql, params);
+      let lastID = 0;
+      if (res.rows && res.rows.length > 0 && res.rows[0].id) {
+        lastID = res.rows[0].id;
+      }
+      return { lastID, changes: res.rowCount };
+    },
+    get: async (sql, params = []) => {
+      const pgSql = convertSql(sql);
+      const res = await pool.query(pgSql, params);
+      return res.rows[0] || null;
+    },
+    all: async (sql, params = []) => {
+      const pgSql = convertSql(sql);
+      const res = await pool.query(pgSql, params);
+      return res.rows;
+    }
+  };
 }
 
 module.exports = { setupDB, getDB };

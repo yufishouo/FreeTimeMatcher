@@ -51,8 +51,12 @@ async function setupDB() {
     is_specific_dates INTEGER DEFAULT 0,
     start_date VARCHAR(255),
     end_date VARCHAR(255),
-    creator_id INTEGER
+    creator_id INTEGER,
+    announcement TEXT
   )`);
+
+  // Upgrade: Add announcement column if missing
+  try { await pool.query(`ALTER TABLE groups ADD COLUMN announcement TEXT`); } catch(e) {}
 
   await pool.query(`CREATE TABLE IF NOT EXISTS schedules (
     user_id INTEGER PRIMARY KEY,
@@ -103,6 +107,9 @@ function getDB() {
   if (!pool) throw new Error('Database not initialized');
   
   // Convert '?' to '$1, $2...' on the fly
+  // ⚠️ 注意：此函數會將 SQL 中所有的 ? 都替換成 $1, $2...
+  // 如果未來有查詢的字串常量中包含 ? (例如 LIKE '%?%')，必須改用 PostgreSQL 原生的 $1 語法，
+  // 不能使用此 wrapper，否則替換會出錯。
   function convertSql(sql) {
     let i = 1;
     return sql.replace(/\?/g, () => `$${i++}`);

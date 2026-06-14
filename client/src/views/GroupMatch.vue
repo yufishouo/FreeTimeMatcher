@@ -56,6 +56,27 @@
           
         </div>
       </div>
+      <!-- 群組公告 -->
+      <div v-if="group.announcement || isAdmin" class="announcement-panel glass-panel mt-4 mb-4">
+        <div class="announcement-header">
+          <h3>📢 群組公告</h3>
+          <button v-if="isAdmin && !editingAnnouncement" @click="startEditAnnouncement" class="btn btn-sm btn-outline">✏️ 編輯</button>
+          <div v-if="isAdmin && editingAnnouncement" style="display: flex; gap: 8px;">
+            <button @click="saveAnnouncement" class="btn btn-sm btn-primary" :disabled="savingAnnouncement">💾 儲存</button>
+            <button @click="cancelEditAnnouncement" class="btn btn-sm btn-outline">取消</button>
+          </div>
+        </div>
+        <div v-if="editingAnnouncement" class="mt-2">
+          <textarea v-model="announcementDraft" class="input-field announcement-textarea" placeholder="輸入公告內容（最多 200 字）" maxlength="200" rows="3"></textarea>
+          <div class="text-muted" style="text-align: right; font-size: 0.8rem; margin-top: 4px;">{{ announcementDraft.length }} / 200</div>
+        </div>
+        <div v-else-if="group.announcement" class="announcement-content mt-2">
+          {{ group.announcement }}
+        </div>
+        <div v-else class="text-muted mt-2" style="font-style: italic;">
+          尚未設定公告，點擊「編輯」來新增一條群組公告吧！
+        </div>
+      </div>
 
       <!-- 系統推薦最佳開會時間 -->
       <div v-if="recommendedTimes.length > 0" class="recommendations-panel glass-panel mt-4 mb-4">
@@ -104,7 +125,7 @@
       <!-- 討論區 -->
       <div class="mt-4 chat-section glass-panel mb-8">
         <h3 class="mb-3">💬 群組討論區</h3>
-        <div class="chat-messages" ref="chatContainer">
+        <div class="chat-messages" ref="chatContainer" @scroll="handleChatScroll">
           <div v-for="msg in messages" :key="msg.id" class="message-bubble" :class="{'my-message': msg.login_username === currentUser.username}">
             <div style="display: flex; gap: 8px; align-items: flex-start; margin-bottom: 4px;">
               <img v-if="msg.avatar_style === 'custom' && msg.avatar_url" :src="msg.avatar_url" alt="Avatar" style="width: 28px; height: 28px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.2); object-fit: cover;" />
@@ -126,6 +147,9 @@
           </div>
           <div v-if="messages.length === 0" class="text-muted text-center py-4">尚無留言，來搶頭香吧！</div>
         </div>
+        <button v-if="hasNewMessages" @click="scrollToBottomAndClear" class="new-msg-indicator">
+          ⬇️ 有新訊息
+        </button>
         <form @submit.prevent="sendMessage" class="chat-input-form mt-3">
           <input type="text" v-model="newMessage" placeholder="輸入留言..." class="input-field" required>
           <button type="submit" class="btn btn-primary" :disabled="!newMessage.trim()">傳送</button>
@@ -232,9 +256,14 @@ const totalWeight = computed(() => {
 const messages = ref([]);
 const newMessage = ref('');
 const chatContainer = ref(null);
+const hasNewMessages = ref(false);
 
 const exportContainer = ref(null);
 const downloading = ref(false);
+
+const editingAnnouncement = ref(false);
+const announcementDraft = ref('');
+const savingAnnouncement = ref(false);
 
 const showEditModal = ref(false);
 const editPaintColor = ref(2);
@@ -269,7 +298,11 @@ onMounted(() => {
       try { msg.parsedPayload = JSON.parse(msg.payload); } catch(e) {}
     }
     messages.value.push(msg);
-    scrollToBottom();
+    if (isUserAtBottom()) {
+      scrollToBottom();
+    } else {
+      hasNewMessages.value = true;
+    }
     
     if (msg.login_username !== currentUser.value?.username) {
       playNotificationSound();
@@ -301,6 +334,12 @@ onMounted(() => {
     fetchGroupMatch();
   });
 
+  socket.value.on('announcement-updated', (newAnnouncement) => {
+    if (group.value) {
+      group.value.announcement = newAnnouncement;
+    }
+  });
+
   socket.value.on('group-deleted', () => {
     showToast('此群組已被解散！', 'info');
     router.push('/');
@@ -310,6 +349,38 @@ onMounted(() => {
 onUnmounted(() => {
   if (socket.value) socket.value.disconnect();
 });
+
+// --- Announcement Functions ---
+const startEditAnnouncement = () => {
+  announcementDraft.value = group.value?.announcement || '';
+  editingAnnouncement.value = true;
+};
+
+const cancelEditAnnouncement = () => {
+  editingAnnouncement.value = false;
+  announcementDraft.value = '';
+};
+
+const saveAnnouncement = async () => {
+  savingAnnouncement.value = true;
+  try {
+    const data = await apiClient.put(`/groups/${route.params.id}/announcement`, {
+      userId: currentUser.value.id,
+      announcement: announcementDraft.value.trim()
+    });
+    if (data.success) {
+      group.value.announcement = announcementDraft.value.trim();
+      editingAnnouncement.value = false;
+      showToast(announcementDraft.value.trim() ? '公告已更新！' : '公告已清除', 'success');
+    } else {
+      showToast(data.error || '更新失敗', 'error');
+    }
+  } catch(e) {
+    showToast('更新公告失敗', 'error');
+  } finally {
+    savingAnnouncement.value = false;
+  }
+};
 
 const fetchGroupMatch = async (showLoading = true) => {
   const groupId = route.params.id;
@@ -499,12 +570,29 @@ const votePoll = async (messageId, optionIndex) => {
   }
 };
 
+const isUserAtBottom = () => {
+  if (!chatContainer.value) return true;
+  const el = chatContainer.value;
+  return el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+};
+
+const handleChatScroll = () => {
+  if (isUserAtBottom()) {
+    hasNewMessages.value = false;
+  }
+};
+
 const scrollToBottom = () => {
   nextTick(() => {
     if (chatContainer.value) {
       chatContainer.value.scrollTop = chatContainer.value.scrollHeight;
     }
   });
+};
+
+const scrollToBottomAndClear = () => {
+  hasNewMessages.value = false;
+  scrollToBottom();
 };
 
 const refreshMatch = () => {
@@ -639,6 +727,36 @@ const downloadImage = async () => {
 .text-center { text-align: center; }
 .text-danger { color: var(--danger); }
 .gap-2 { gap: 8px; }
+
+.announcement-panel {
+  padding: 20px;
+  border-left: 4px solid var(--primary);
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.05), rgba(236, 72, 153, 0.03));
+}
+
+.announcement-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.announcement-header h3 {
+  margin: 0;
+}
+
+.announcement-content {
+  font-size: 1.05rem;
+  line-height: 1.6;
+  color: var(--text-main);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.announcement-textarea {
+  resize: vertical;
+  min-height: 80px;
+  font-family: 'Outfit', sans-serif;
+}
 
 .group-title {
   margin: 0;
@@ -817,6 +935,34 @@ const downloadImage = async () => {
 /* Chat styles */
 .chat-section {
   padding: 20px;
+  position: relative;
+}
+
+.new-msg-indicator {
+  display: block;
+  margin: 8px auto 0;
+  padding: 6px 20px;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  color: white;
+  border: none;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-family: 'Outfit', sans-serif;
+  animation: bounceIn 0.3s ease;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.new-msg-indicator:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(99, 102, 241, 0.5);
+}
+
+@keyframes bounceIn {
+  0% { opacity: 0; transform: translateY(10px); }
+  100% { opacity: 1; transform: translateY(0); }
 }
 
 .chat-messages {

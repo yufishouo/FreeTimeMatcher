@@ -30,10 +30,31 @@ const asyncHandler = fn => (req, res, next) => {
 };
 
 const bcrypt = require('bcryptjs');
+const rateLimit = require('express-rate-limit');
+
+// Rate limiter: 登入/註冊 每個 IP 每 15 分鐘最多 20 次
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: { error: '請求過於頻繁，請 15 分鐘後再試' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Rate limiter: 一般 API 每個 IP 每分鐘最多 120 次
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  message: { error: '請求過於頻繁，請稍後再試' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use('/api', apiLimiter);
 
 // --- User API ---
 
-app.post('/api/auth/register', asyncHandler(async (req, res) => {
+app.post('/api/auth/register', authLimiter, asyncHandler(async (req, res) => {
   const { username, password } = req.body;
   if (!username) return res.status(400).json({ error: '請輸入暱稱' });
   if (username.length > 20) return res.status(400).json({ error: '暱稱不能超過 20 個字' });
@@ -49,10 +70,10 @@ app.post('/api/auth/register', asyncHandler(async (req, res) => {
   const hashedPassword = await bcrypt.hash(password, salt);
 
   const result = await db.run('INSERT INTO users (username, password) VALUES (?, ?) RETURNING id', [username, hashedPassword]);
-  res.json({ user: { id: result.lastID, username, display_name: username } });
+  res.json({ user: { id: result.lastID, username, display_name: username, theme_color: 'default', avatar_style: 'notionists', avatar_url: '' } });
 }));
 
-app.post('/api/auth/login', asyncHandler(async (req, res) => {
+app.post('/api/auth/login', authLimiter, asyncHandler(async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: '請輸入暱稱與密碼' });
 
@@ -67,7 +88,7 @@ app.post('/api/auth/login', asyncHandler(async (req, res) => {
     return res.status(400).json({ error: '密碼錯誤' });
   }
 
-  res.json({ user: { id: user.id, username: user.username, display_name: user.display_name || user.username } });
+  res.json({ user: { id: user.id, username: user.username, display_name: user.display_name || user.username, theme_color: user.theme_color || 'default', avatar_style: user.avatar_style || 'notionists', avatar_url: user.avatar_url || '' } });
 }));
 
 // --- Profile API ---
@@ -116,6 +137,7 @@ app.put('/api/users/:userId/profile', asyncHandler(async (req, res) => {
 
   // Fetch updated user to return
   const user = await db.get('SELECT * FROM users WHERE id = ?', [userId]);
+  delete user.password;
   res.json({ success: true, user });
 }));
 // --- Stats API ---
@@ -253,6 +275,34 @@ app.get('/api/users/:userId/groups', asyncHandler(async (req, res) => {
       WHERE gm.user_id = ?
   `, [userId]);
   res.json({ groups: rows });
+}));
+
+// --- Announcement API ---
+
+app.put('/api/groups/:groupId/announcement', asyncHandler(async (req, res) => {
+  const { groupId } = req.params;
+  const { userId, announcement } = req.body;
+  const db = getDB();
+
+  const group = await db.get('SELECT * FROM groups WHERE id = ?', [groupId]);
+  if (!group) return res.status(404).json({ error: '找不到群組' });
+
+  // 只有管理員或副管理員可以編輯公告
+  const isCreator = group.creator_id === parseInt(userId);
+  const memberRow = await db.get('SELECT role FROM group_members WHERE group_id = ? AND user_id = ?', [groupId, userId]);
+  const isSubadmin = memberRow && memberRow.role === 'subadmin';
+
+  if (!isCreator && !isSubadmin) {
+    return res.status(403).json({ error: '權限不足：只有管理員或副管理員可以編輯公告' });
+  }
+
+  if (announcement && announcement.length > 200) {
+    return res.status(400).json({ error: '公告不能超過 200 個字' });
+  }
+
+  await db.run('UPDATE groups SET announcement = ? WHERE id = ?', [announcement || null, groupId]);
+  io.to(`group-${groupId}`).emit('announcement-updated', announcement || '');
+  res.json({ success: true });
 }));
 
 app.delete('/api/groups/:groupId', asyncHandler(async (req, res) => {
@@ -468,13 +518,13 @@ app.post('/api/messages/:messageId/vote', asyncHandler(async (req, res) => {
   // 移除使用者先前的投票
   payload.options.forEach(opt => {
     if (!opt.voters) opt.voters = [];
-    opt.voters = opt.voters.filter(id => id !== userId);
+    opt.voters = opt.voters.filter(id => String(id) !== String(userId));
   });
   
   // 加入新選項
   if (optionIndex !== null && payload.options[optionIndex]) {
     if (!payload.options[optionIndex].voters) payload.options[optionIndex].voters = [];
-    payload.options[optionIndex].voters.push(userId);
+    payload.options[optionIndex].voters.push(Number(userId));
   }
   
   const newPayloadStr = JSON.stringify(payload);

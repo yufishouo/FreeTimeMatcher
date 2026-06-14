@@ -202,7 +202,14 @@ const authAction = async () => {
           router.push('/');
         }
       } else {
-        fetchGroups();
+        // 檢查是否有「被攔截前想去的頁面」
+        const redirectPath = sessionStorage.getItem('redirectAfterLogin');
+        if (redirectPath) {
+          sessionStorage.removeItem('redirectAfterLogin');
+          router.push(redirectPath);
+        } else {
+          fetchGroups();
+        }
       }
       
       showToast(isLoginMode.value ? '登入成功！' : '註冊成功！', 'success');
@@ -308,8 +315,9 @@ const joinGroup = async () => {
 };
 
 const copyCode = (code) => {
-  navigator.clipboard.writeText(code);
-  showToast('邀請碼已複製！', 'success');
+  navigator.clipboard.writeText(code)
+    .then(() => showToast('邀請碼已複製！', 'success'))
+    .catch(() => showToast(`邀請碼: ${code}`, 'info'));
 };
 </script>
 
@@ -355,12 +363,6 @@ const copyCode = (code) => {
     opacity: 1;
     transform: translateY(0);
   }
-}
-
-.hero-title {
-  font-size: 3rem;
-  line-height: 1.2;
-  margin-bottom: 24px;
 }
 
 .hero-subtitle {

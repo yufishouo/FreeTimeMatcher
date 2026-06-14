@@ -193,9 +193,8 @@
     <!-- 成員資訊彈窗 -->
     <div v-if="selectedMember" class="modal-overlay" @click.self="selectedMember = null">
       <div class="modal-content glass-panel" style="max-width: 400px; text-align: center;">
-        <div class="modal-header">
+        <div class="modal-header mb-4">
           <h3>👤 成員資訊</h3>
-          <button class="close-btn" @click="selectedMember = null">✖</button>
         </div>
         <div class="modal-body" style="display: flex; flex-direction: column; align-items: center; gap: 16px;">
           <img v-if="selectedMember.avatar_style === 'custom' && selectedMember.avatar_url" :src="selectedMember.avatar_url" alt="Avatar" style="width: 100px; height: 100px; border-radius: 50%; border: 4px solid var(--primary); object-fit: cover;" />

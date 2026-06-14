@@ -23,6 +23,7 @@
               class="input-field"
               required
               :disabled="loading"
+              autocomplete="username"
             />
           </div>
           <div style="margin-bottom: 24px; text-align: left;">
@@ -34,7 +35,14 @@
               class="input-field"
               required
               :disabled="loading"
+              :autocomplete="isLoginMode ? 'current-password' : 'new-password'"
             />
+            <div v-if="!isLoginMode && password.length > 0" class="password-strength mt-2">
+              <div class="strength-bar">
+                <div class="strength-fill" :style="{ width: passwordStrength.width, background: passwordStrength.color }"></div>
+              </div>
+              <span class="strength-text" :style="{ color: passwordStrength.color }">{{ passwordStrength.label }}</span>
+            </div>
           </div>
           <button type="submit" class="btn btn-primary w-full" :disabled="loading">
             {{ loading ? '處理中...' : (isLoginMode ? '登入系統' : '註冊帳號') }}
@@ -102,7 +110,9 @@
               class="input-field mb-3"
               required
             />
-            <button type="submit" class="btn btn-outline w-full">加入群組</button>
+            <button type="submit" class="btn btn-outline w-full" :disabled="joiningGroup">
+              {{ joiningGroup ? '加入中...' : '加入群組' }}
+            </button>
           </form>
         </div>
       </div>
@@ -110,8 +120,10 @@
       <!-- Group List -->
       <div class="group-list mt-8">
         <h3>已加入的群組</h3>
-        <div v-if="groups.length === 0" class="empty-state glass-panel mt-4">
-          您目前尚未參與任何群組，趕快建立或加入一個吧！
+        <div v-if="groups.length === 0" class="empty-state glass-panel mt-4" style="text-align: center; padding: 48px 24px;">
+          <div style="font-size: 4rem; margin-bottom: 16px;">📭</div>
+          <h4 style="margin-bottom: 8px;">您目前尚未參與任何群組</h4>
+          <p class="text-muted">點擊上方「建立群組」或「加入群組」開始使用！</p>
         </div>
         <div v-else class="grid mt-4">
           <div v-for="group in groups" :key="group.id" class="glass-panel group-card">
@@ -130,7 +142,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { showToast } from '../toastState.js';
 import { apiClient } from '../api.js';
@@ -144,6 +156,20 @@ const username = ref('');
 const password = ref('');
 const isLoginMode = ref(true);
 const creatingGroup = ref(false);
+const joiningGroup = ref(false);
+
+const passwordStrength = computed(() => {
+  const p = password.value;
+  if (p.length < 6) return { width: '20%', color: '#ef4444', label: '太短' };
+  const hasUpper = /[A-Z]/.test(p);
+  const hasLower = /[a-z]/.test(p);
+  const hasNum = /[0-9]/.test(p);
+  const hasSpecial = /[^A-Za-z0-9]/.test(p);
+  const score = [hasUpper, hasLower, hasNum, hasSpecial].filter(Boolean).length;
+  if (p.length >= 8 && score >= 3) return { width: '100%', color: '#10b981', label: '強' };
+  if (p.length >= 8 && score >= 2) return { width: '75%', color: '#f59e0b', label: '中等' };
+  return { width: '40%', color: '#f97316', label: '弱' };
+});
 
 const newGroupName = ref('');
 const isSpecificDates = ref(false);
@@ -296,6 +322,7 @@ const createGroup = async () => {
 
 const joinGroup = async () => {
   if (!inviteCode.value) return null;
+  joiningGroup.value = true;
   try {
     const data = await apiClient.post('/groups/join', { inviteCode: inviteCode.value.toUpperCase(), userId: user.value.id });
     if (data.error) {
@@ -311,6 +338,8 @@ const joinGroup = async () => {
     console.error('Join group error', error);
     showToast('加入群組失敗，請確認網路連線。', 'error');
     return null;
+  } finally {
+    joiningGroup.value = false;
   }
 };
 
@@ -325,6 +354,36 @@ const copyCode = (code) => {
 .text-center { text-align: center; }
 .mx-auto { margin-left: auto; margin-right: auto; }
 .w-full { width: 100%; }
+
+.password-strength {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.strength-bar {
+  flex: 1;
+  height: 6px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+:root[data-theme="light"] .strength-bar {
+  background: rgba(0,0,0,0.1);
+}
+
+.strength-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease, background 0.3s ease;
+}
+
+.strength-text {
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
 .mb-3 { margin-bottom: 12px; }
 .mb-4 { margin-bottom: 16px; }
 .mt-4 { margin-top: 16px; }

@@ -171,6 +171,12 @@
           <button class="btn paint-btn busy" :class="{'active': editPaintColor === 0}" @click="editPaintColor = 0">❌ 沒空</button>
         </div>
 
+        <div class="quick-actions mb-4" style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button @click="quickFillWeekend" class="btn btn-sm btn-outline" style="font-size: 0.8rem;">📅 週末全標沒空</button>
+          <button @click="quickFillEvening" class="btn btn-sm btn-outline" style="font-size: 0.8rem;">🌙 晚上全標沒空</button>
+          <button @click="quickClearAll" class="btn btn-sm btn-outline" style="font-size: 0.8rem;">🔄 全部清除</button>
+        </div>
+
         <ScheduleGrid 
           v-model="myGroupSchedule" 
           :paintColor="editPaintColor" 
@@ -213,7 +219,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, onUnmounted, nextTick } from 'vue';
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { io } from 'socket.io-client';
 import html2canvas from 'html2canvas';
@@ -270,6 +276,18 @@ const editPaintColor = ref(2);
 const savingSchedule = ref(false);
 const myGroupSchedule = ref([]);
 
+// Modal 開啟時鎖定背景滾動 + Escape 關閉
+watch(showEditModal, (val) => {
+  document.body.style.overflow = val ? 'hidden' : '';
+});
+
+const handleEscKey = (e) => {
+  if (e.key === 'Escape') {
+    if (showEditModal.value) showEditModal.value = false;
+    if (selectedMember.value) selectedMember.value = null;
+  }
+};
+
 onMounted(() => {
   const storedUser = localStorage.getItem('user');
   if (!storedUser || storedUser === 'undefined') {
@@ -284,6 +302,8 @@ onMounted(() => {
   }
   fetchGroupMatch();
   fetchMessages();
+
+  window.addEventListener('keydown', handleEscKey);
 
   // Socket.io connection
   socket.value = io(SOCKET_URL);
@@ -348,6 +368,8 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (socket.value) socket.value.disconnect();
+  window.removeEventListener('keydown', handleEscKey);
+  document.body.style.overflow = '';
 });
 
 // --- Announcement Functions ---
@@ -435,6 +457,40 @@ const kickMember = async (memberId) => {
   } catch (e) {
     showToast(e.message || '無法移除該成員，請稍後再試', 'error');
   }
+};
+
+// --- Quick Schedule Fill ---
+const quickFillWeekend = () => {
+  const newSchedule = myGroupSchedule.value.map((day, idx) => [...day]);
+  const days = customDays.value;
+  for (let d = 0; d < days.length; d++) {
+    const dayLabel = days[d];
+    // 判斷是否為週末：純星期模式看「六」「日」，日期模式看括號中的星期
+    const isWeekend = dayLabel === '六' || dayLabel === '日' || dayLabel.includes('(六)') || dayLabel.includes('(日)');
+    if (isWeekend) {
+      for (let p = 0; p < 14; p++) {
+        newSchedule[d][p] = 0;
+      }
+    }
+  }
+  myGroupSchedule.value = newSchedule;
+  showToast('已將週末全部標記為沒空', 'success');
+};
+
+const quickFillEvening = () => {
+  const newSchedule = myGroupSchedule.value.map(day => [...day]);
+  for (let d = 0; d < newSchedule.length; d++) {
+    for (let p = 9; p < 14; p++) { // 第 10~14 節 (index 9~13)
+      newSchedule[d][p] = 0;
+    }
+  }
+  myGroupSchedule.value = newSchedule;
+  showToast('已將每天第 10-14 節標記為沒空', 'success');
+};
+
+const quickClearAll = () => {
+  myGroupSchedule.value = Array(customDays.value.length).fill().map(() => Array(14).fill(0));
+  showToast('已清除全部課表', 'info');
 };
 
 const playNotificationSound = () => {
@@ -1026,15 +1082,21 @@ const downloadImage = async () => {
 .modal-overlay {
   position: fixed;
   top: 0; left: 0; width: 100%; height: 100%;
-  background: rgba(0,0,0,0.6);
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   display: flex; align-items: center; justify-content: center;
-  z-index: 1000;
+  z-index: 9999;
 }
 .modal-content {
-  background: var(--bg-color);
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   padding: 24px;
-  border-radius: 12px;
+  border-radius: 16px;
   width: 90%; max-width: 900px;
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-lg);
 }
 .py-4 { padding-top: 16px; padding-bottom: 16px; }
 .mb-8 { margin-bottom: 32px; }

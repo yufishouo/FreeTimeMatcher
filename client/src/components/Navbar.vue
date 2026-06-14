@@ -6,10 +6,14 @@
         <span class="text">FreeTime<span class="highlight">Matcher</span></span>
       </router-link>
       
-      <div class="nav-links">
+      <button v-if="user" class="hamburger" :class="{'is-open': menuOpen}" @click="menuOpen = !menuOpen" aria-label="選單">
+        <span></span><span></span><span></span>
+      </button>
+
+      <div class="nav-links" :class="{'nav-open': menuOpen}">
         <template v-if="user">
-          <router-link to="/" class="nav-item">🏠 群組首頁</router-link>
-          <router-link to="/profile" class="nav-item">📅 個人資訊</router-link>
+          <router-link to="/" class="nav-item" @click="menuOpen = false">🏠 群組首頁</router-link>
+          <router-link to="/profile" class="nav-item" @click="menuOpen = false">📅 個人資訊</router-link>
           <div class="user-badge" style="display: flex; align-items: center; gap: 8px;">
             <img v-if="user.avatar_style === 'custom' && user.avatar_url" :src="user.avatar_url" alt="Avatar" style="width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--primary); object-fit: cover;" />
             <img v-else :src="`https://api.dicebear.com/9.x/${user.avatar_style === 'custom' ? 'notionists' : user.avatar_style || 'notionists'}/svg?seed=${user.username}&backgroundColor=b6e3f4,c0aede,d1d4f9`" alt="Avatar" style="width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--primary); object-fit: cover;" />
@@ -28,6 +32,7 @@ import { useRouter } from 'vue-router';
 
 const user = ref(null);
 const router = useRouter();
+const menuOpen = ref(false);
 
 const checkTheme = () => {
   const storedUser = localStorage.getItem('user');
@@ -52,6 +57,11 @@ const checkUser = () => {
   }
 };
 
+// 路由切換時關閉選單
+router.afterEach(() => {
+  menuOpen.value = false;
+});
+
 onMounted(() => {
   checkTheme();
   checkUser();
@@ -65,6 +75,7 @@ onUnmounted(() => {
 const logout = () => {
   localStorage.removeItem('user');
   user.value = null;
+  menuOpen.value = false;
   window.dispatchEvent(new Event('user-changed'));
   router.push('/');
 };
@@ -77,9 +88,15 @@ const logout = () => {
   padding: 12px 32px;
   position: sticky;
   top: 24px;
-  z-index: 100;
+  z-index: 1000;
   border-radius: 40px;
   overflow: visible !important;
+  /* 覆蓋 glass-panel 的 hover 效果，避免干擾點擊 */
+  transform: none !important;
+}
+
+.navbar:hover {
+  transform: none !important;
 }
 
 .nav-container {
@@ -132,6 +149,8 @@ const logout = () => {
   font-weight: 600;
   transition: all 0.2s;
   position: relative;
+  cursor: pointer;
+  padding: 4px 0;
 }
 
 .nav-item::after {
@@ -174,22 +193,91 @@ const logout = () => {
   background: rgba(79, 70, 229, 0.1);
 }
 
+/* Hamburger Button */
+.hamburger {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  z-index: 1001;
+}
+
+.hamburger span {
+  display: block;
+  width: 24px;
+  height: 2.5px;
+  background: var(--text-main);
+  border-radius: 4px;
+  transition: all 0.3s ease;
+}
+
+.hamburger.is-open span:nth-child(1) {
+  transform: rotate(45deg) translate(5px, 5px);
+}
+
+.hamburger.is-open span:nth-child(2) {
+  opacity: 0;
+}
+
+.hamburger.is-open span:nth-child(3) {
+  transform: rotate(-45deg) translate(6px, -6px);
+}
+
 @media (max-width: 768px) {
   .navbar {
     padding: 12px 16px;
     margin: 12px;
     border-radius: 20px;
-    position: static;
+    position: sticky;
+    top: 12px;
   }
-  .nav-container {
-    flex-direction: column;
-    gap: 12px;
+
+  .hamburger {
+    display: flex;
   }
+
   .nav-links {
-    flex-wrap: wrap;
-    justify-content: center;
+    display: none;
+    flex-direction: column;
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    left: 0;
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    padding: 16px;
     gap: 12px;
+    box-shadow: var(--shadow-lg);
+    z-index: 1001;
   }
+
+  .nav-links.nav-open {
+    display: flex;
+  }
+
+  .nav-item {
+    padding: 8px 12px;
+    border-radius: 10px;
+    width: 100%;
+    text-align: center;
+  }
+
+  .nav-item:hover {
+    background: rgba(255,255,255,0.05);
+  }
+
+  .user-badge {
+    justify-content: center;
+    width: 100%;
+  }
+
   .logo .text {
     font-size: 1.2rem;
   }
